@@ -44,12 +44,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --gradient-dark-bg: linear-gradient(to right, #10091a 0%, #06101e 100%);
 }
 
 :root {
   --radius: 0.625rem;
   --background: oklch(0.932 0.007 247.899);
-  --foreground: oklch(0.29 0.001 17.241);
+  --foreground: oklch(0.373 0.034 260.169);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);

@@ -11,11 +11,19 @@
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-navigation-menu": "^1.2.13",
+    "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.12",
+    "@rainbow-me/rainbowkit": "^2.2.6",
+    "@tanstack/react-query": "^5.80.6",
+    "@wagmi/connectors": "^5.8.5",
+    "@wagmi/core": "^2.17.3",
     "autoprefixer": "^10.4.21",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "connectkit": "^1.9.0",
+    "ethers": "^6.14.3",
     "framer-motion": "^12.16.0",
     "lucide-react": "^0.513.0",
     "next": "15.3.3",
@@ -25,7 +33,9 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
-    "tailwind-merge": "^3.3.0"
+    "tailwind-merge": "^3.3.0",
+    "viem": "^2.30.6",
+    "wagmi": "^2.15.6"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

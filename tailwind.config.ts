@@ -35,6 +35,10 @@ module.exports = {
           to: { "--border-angle": "360deg" },
         },
       },
+      backgroundImage: {
+        "gradient-dark":
+          "linear-gradient(to right, #10091a 0%, #131923 60%, #06101e 100%)",
+      },
     },
   },
   plugins: [],

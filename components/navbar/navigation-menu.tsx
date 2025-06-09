@@ -19,7 +19,10 @@ const MainNavigationMenu = () => {
             <div key={item.label}>
               <NavigationMenuLink
                 asChild
-                className={cn(navigationMenuTriggerStyle(), "bg-transparent")}
+                className={cn(
+                  navigationMenuTriggerStyle(),
+                  "bg-transparent hover:bg-indigo-300/15",
+                )}
               >
                 <Link href={item.href}>{item.label}</Link>
               </NavigationMenuLink>

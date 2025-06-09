@@ -5,10 +5,13 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import HeroImage from "@/components/ui/hero-image";
+import { useRouter } from "next/navigation";
 
 export default function HeroSection() {
   const [, setHasAnimated] = useState(false);
   const [, setInitialState] = useState("hidden");
+
+  const router = useRouter();
 
   // Memoize the headline text processing
   const { words } = useMemo(() => {
@@ -33,7 +36,7 @@ export default function HeroSection() {
   return (
     <section
       id="home"
-      className="justify-center items-center min-h-screen relative pt-[6rem] lg:pt-[13rem] -mt-20"
+      className="justify-center items-center min-h-screen relative pt-[11rem] lg:pt-[15rem] -mt-20"
     >
       <div
         className={cn(
@@ -58,9 +61,9 @@ export default function HeroSection() {
 
       <div className="container mx-auto flex flex-col overflow-hidden">
         {/* Optimized decorative elements */}
-        <div className="size-18 rounded-full bg-gradient-to-br from-white to-zinc-900/15 absolute top-52 right-[10%] will-change-transform" />
+        <div className="size-10 lg:size-18 rounded-full bg-gradient-to-br from-white to-zinc-900/15 absolute top-52 right-[10%] will-change-transform" />
 
-        <div className="size-18 rounded-full bg-gradient-to-br from-blue-200 via-purple-400/15 to-purple-900/10 absolute top-[30rem] md:top-96 left-[10%] will-change-transform" />
+        <div className="size-10 lg:size-18 rounded-full bg-gradient-to-br from-blue-200 via-purple-400/15 to-purple-900/10 absolute top-[30rem] md:top-96 left-[10%] will-change-transform" />
 
         <div className="flex flex-col justify-center items-center relative">
           {/* Main headline - optimized for LCP */}
@@ -86,6 +89,7 @@ export default function HeroSection() {
             <Button
               className="bg-[#EEF2FF] font-bold rounded-full text-neutral-600 hover:bg-gradient-to-tr hover:from-zinc-700 hover:via-55% hover:to-gray-500 hover:text-white text-md p-6 md:text-lg md:p-8 shadow-lg transition-all duration-200 md:w-[15rem] hover:scale-105 cursor-pointer will-change-transform"
               variant="outline"
+              onClick={() => router.push("/elections")}
             >
               View Elections
             </Button>
