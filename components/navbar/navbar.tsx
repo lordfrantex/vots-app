@@ -18,6 +18,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { CustomConnectButton } from "@/components/ui/custom-connect-button";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -65,7 +66,7 @@ const Navbar = () => {
 
         {/* Connect Button - with min width to prevent squishing */}
         <div className="min-w-[140px] flex-shrink-0">
-          <ConnectButton showBalance={false} chainStatus="none" />
+          <CustomConnectButton />
         </div>
       </div>
 

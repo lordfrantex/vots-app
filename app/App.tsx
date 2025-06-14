@@ -3,25 +3,12 @@
 import React from "react";
 import "@rainbow-me/rainbowkit/styles.css";
 
-import { getDefaultConfig, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
-import {
-  mainnet,
-  polygon,
-  optimism,
-  arbitrum,
-  base,
-  sepolia,
-} from "wagmi/chains";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
+import { getConfig } from "@/utils/config";
 
-const config = getDefaultConfig({
-  appName: "My RainbowKit App",
-  projectId: "YOUR_PROJECT_ID",
-  chains: [mainnet, sepolia, polygon, optimism, arbitrum, base],
-  ssr: true, // If your dApp uses server side rendering (SSR)
-});
-
+const config = getConfig();
 const queryClient = new QueryClient();
 
 const App = ({ children }: { children: React.ReactNode }) => {
@@ -33,4 +20,5 @@ const App = ({ children }: { children: React.ReactNode }) => {
     </WagmiProvider>
   );
 };
+
 export default App;

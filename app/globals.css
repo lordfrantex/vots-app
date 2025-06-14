@@ -128,4 +128,14 @@
     background-image: linear-gradient(to right, #10091a 0%, #131923 60%, #06101e 100%);
   }
 
+  /* Hide scrollbar but allow scroll */
+  .scroll-hide {
+    scrollbar-width: none;       /* Firefox */
+    -ms-overflow-style: none;    /* IE and Edge */
+  }
+
+  .scroll-hide::-webkit-scrollbar {
+    display: none;               /* Chrome, Safari */
+  }
+
 }

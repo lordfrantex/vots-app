@@ -3,7 +3,7 @@ import ElectionMain from "@/app/elections/[electionId]/components/election-main"
 
 import { fetchElectionById } from "@/constants/mock-elections";
 import ElectionCandidates from "@/app/elections/[electionId]/components/election-candidates";
-import ElectionSummaryInfo from "@/app/elections/[electionId]/components/election-summary-info";
+import ElectionInformation from "@/app/elections/[electionId]/components/election-information";
 
 interface ElectionPageProps {
   params: {
@@ -29,7 +29,9 @@ const ElectionPage: React.FC<ElectionPageProps> = async ({ params }) => {
         <div className="max-w-[1400px] mx-auto">
           <ElectionMain election={election} />
           <ElectionCandidates election={election} />
-          <ElectionSummaryInfo />
+          <ElectionInformation
+              election={election}
+          />
         </div>
       </section>
     );

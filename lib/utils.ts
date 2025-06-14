@@ -37,3 +37,19 @@ export const calculateTimeRemaining = (
 export const formatNumber = (num: number): string => {
   return num.toString().padStart(2, "0");
 };
+
+export const formatDate = (date: Date) => {
+  return (
+    date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }) +
+    " - " +
+    date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+  );
+};
