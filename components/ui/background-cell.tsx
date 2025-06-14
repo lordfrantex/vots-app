@@ -1,18 +1,20 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAnimation, motion } from "framer-motion";
 
 export const BackgroundCellCore = () => {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  const ref = useRef<any>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const handleMouseMove = (event: any) => {
-    const rect = ref.current && ref.current.getBoundingClientRect();
-    setMousePosition({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
+  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) {
+      setMousePosition({
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      });
+    }
   };
 
   const size = 300;
@@ -63,7 +65,7 @@ const Pattern = ({
   const x = new Array(47).fill(0);
   const y = new Array(30).fill(0);
   const matrix = x.map((_, i) => y.map((_, j) => [i, j]));
-  const [clickedCell, setClickedCell] = useState<any>(null);
+  const [clickedCell, setClickedCell] = useState<[number, number] | null>(null);
 
   return (
     <div className={cn("flex flex-row  relative z-30", className)}>
@@ -88,7 +90,7 @@ const Pattern = ({
                   transition: { duration: distance * 0.2 },
                 });
               }
-            }, [clickedCell]);
+            }, [clickedCell, rowIdx, colIdx, controls]);
 
             return (
               <div
