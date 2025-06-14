@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAnimation, motion } from "framer-motion";
 
@@ -90,7 +90,7 @@ const Pattern = ({
                   transition: { duration: distance * 0.2 },
                 });
               }
-            }, [clickedCell, rowIdx, colIdx, controls]);
+            }, [clickedCell, colIdx, controls]);
 
             return (
               <div

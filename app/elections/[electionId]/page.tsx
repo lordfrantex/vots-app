@@ -5,13 +5,13 @@ import ElectionCandidates from "@/app/elections/[electionId]/components/election
 import ElectionInformation from "@/app/elections/[electionId]/components/election-information";
 
 interface ElectionPageProps {
-  params: {
+  params: Promise<{
     electionId: string;
-  };
+  }>;
 }
 
 const ElectionPage: React.FC<ElectionPageProps> = async ({ params }) => {
-  const { electionId } = params;
+  const { electionId } = await params;
 
   try {
     const election = await fetchElectionById(electionId);
