@@ -1,6 +1,5 @@
 import React from "react";
 import ElectionMain from "@/app/elections/[electionId]/components/election-main";
-
 import { fetchElectionById } from "@/constants/mock-elections";
 import ElectionCandidates from "@/app/elections/[electionId]/components/election-candidates";
 import ElectionInformation from "@/app/elections/[electionId]/components/election-information";
@@ -12,7 +11,7 @@ interface ElectionPageProps {
 }
 
 const ElectionPage: React.FC<ElectionPageProps> = async ({ params }) => {
-  const { electionId } = await params;
+  const { electionId } = params;
 
   try {
     const election = await fetchElectionById(electionId);
@@ -29,9 +28,7 @@ const ElectionPage: React.FC<ElectionPageProps> = async ({ params }) => {
         <div className="max-w-[1400px] mx-auto">
           <ElectionMain election={election} />
           <ElectionCandidates election={election} />
-          <ElectionInformation
-              election={election}
-          />
+          <ElectionInformation election={election} />
         </div>
       </section>
     );
