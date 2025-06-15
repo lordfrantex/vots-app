@@ -61,19 +61,26 @@ const CHART_COLORS = [
 ];
 
 const ElectionChart: React.FC<ElectionChartProps> = ({
-  election,
-  selectedCategory,
-  showCategoryTabs = true,
-  showChartTypeToggle = true,
-  defaultChartType = "pie",
-  onCategoryChange,
-  resultsByCategory: propResultsByCategory,
-  customTabsClassName,
-}) => {
+                                                       election,
+                                                       selectedCategory,
+                                                       showCategoryTabs = true,
+                                                       showChartTypeToggle = true,
+                                                       defaultChartType = "pie",
+                                                       onCategoryChange,
+                                                       resultsByCategory: propResultsByCategory,
+                                                       customTabsClassName,
+                                                     }) => {
   const [chartType, setChartType] = useState<"pie" | "bar">(defaultChartType);
   const [activeCategory, setActiveCategory] = useState(
-    selectedCategory || election.categories[0],
+      selectedCategory || election.categories[0],
   );
+
+  // Update activeCategory when selectedCategory prop changes
+  React.useEffect(() => {
+    if (selectedCategory) {
+      setActiveCategory(selectedCategory);
+    }
+  }, [selectedCategory]);
 
   // Use provided resultsByCategory or calculate it
   const resultsByCategory = React.useMemo(() => {
@@ -83,14 +90,14 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
 
     // Group candidates by category and sort by votes
     const results = (election?.candidates ?? []).reduce(
-      (acc, candidate) => {
-        if (!acc[candidate.category]) {
-          acc[candidate.category] = [];
-        }
-        acc[candidate.category].push(candidate);
-        return acc;
-      },
-      {} as Record<string, Candidate[]>,
+        (acc, candidate) => {
+          if (!acc[candidate.category]) {
+            acc[candidate.category] = [];
+          }
+          acc[candidate.category].push(candidate);
+          return acc;
+        },
+        {} as Record<string, Candidate[]>,
     );
 
     // Sort candidates by vote count within each category
@@ -151,13 +158,13 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
 
     const winner = candidates[0];
     const totalCategoryVotes = candidates.reduce(
-      (sum, c) => sum + (c.voteCount || 0),
-      0,
+        (sum, c) => sum + (c.voteCount || 0),
+        0,
     );
     const winnerPercentage =
-      totalCategoryVotes > 0
-        ? (((winner.voteCount || 0) / totalCategoryVotes) * 100).toFixed(1)
-        : "0";
+        totalCategoryVotes > 0
+            ? (((winner.voteCount || 0) / totalCategoryVotes) * 100).toFixed(1)
+            : "0";
 
     return { winner, percentage: winnerPercentage };
   };
@@ -167,8 +174,86 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
   const renderChart = () => {
     if (chartType === "pie") {
       return (
-        <Card className="flex flex-col bg-gray-50 dark:bg-gray-900">
-          <CardHeader className="items-center pb-0">
+          <Card className="flex flex-col bg-gray-50 dark:bg-gray-900">
+            <CardHeader className="items-center pb-0">
+              <CardTitle className="text-lg">
+                {activeCategory} - Vote Distribution
+              </CardTitle>
+              <CardDescription>
+                Election Results for {activeCategory}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 pb-0">
+              <ChartContainer
+                  config={chartConfig}
+                  className="mx-auto aspect-square max-h-[350px]"
+              >
+                <PieChart>
+                  <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                  />
+                  <Pie
+                      data={chartData}
+                      dataKey="votes"
+                      nameKey="name"
+                      innerRadius={60}
+                      strokeWidth={5}
+                  >
+                    <Label
+                        content={({ viewBox }) => {
+                          if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                            return (
+                                <text
+                                    x={viewBox.cx}
+                                    y={viewBox.cy}
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                >
+                                  <tspan
+                                      x={viewBox.cx}
+                                      y={viewBox.cy}
+                                      className="fill-foreground text-3xl font-bold"
+                                  >
+                                    {totalVotes.toLocaleString()}
+                                  </tspan>
+                                  <tspan
+                                      x={viewBox.cx}
+                                      y={(viewBox.cy || 0) + 24}
+                                      className="fill-muted-foreground text-sm"
+                                  >
+                                    Total Votes
+                                  </tspan>
+                                </text>
+                            );
+                          }
+                        }}
+                    />
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+            </CardContent>
+            <CardFooter className="flex-col gap-2 text-sm items-center">
+              {winnerInfo && (
+                  <>
+                    <div className="flex items-center gap-2 leading-none font-medium text-green-600">
+                      <TrendingUp className="h-4 w-4" />
+                      {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
+                      of votes
+                    </div>
+                    <div className="text-muted-foreground leading-none text-center">
+                      {totalVotes} total votes cast in {activeCategory}
+                    </div>
+                  </>
+              )}
+            </CardFooter>
+          </Card>
+      );
+    }
+
+    return (
+        <Card className="bg-gray-50 dark:bg-gray-900">
+          <CardHeader>
             <CardTitle className="text-lg">
               {activeCategory} - Vote Distribution
             </CardTitle>
@@ -176,230 +261,154 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
               Election Results for {activeCategory}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 pb-0">
-            <ChartContainer
-              config={chartConfig}
-              className="mx-auto aspect-square max-h-[350px]"
-            >
-              <PieChart>
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
-                />
-                <Pie
-                  data={chartData}
-                  dataKey="votes"
-                  nameKey="name"
-                  innerRadius={60}
-                  strokeWidth={5}
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px] mx-auto">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                    data={chartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    maxBarSize={60} // Reduced bar width
                 >
-                  <Label
-                    content={({ viewBox }) => {
-                      if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                        return (
-                          <text
-                            x={viewBox.cx}
-                            y={viewBox.cy}
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                          >
-                            <tspan
-                              x={viewBox.cx}
-                              y={viewBox.cy}
-                              className="fill-foreground text-3xl font-bold"
-                            >
-                              {totalVotes.toLocaleString()}
-                            </tspan>
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) + 24}
-                              className="fill-muted-foreground text-sm"
-                            >
-                              Total Votes
-                            </tspan>
-                          </text>
-                        );
-                      }
-                    }}
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis
+                      dataKey="name"
+                      tickLine={false}
+                      tickMargin={10}
+                      axisLine={false}
+                      tickFormatter={(value) => {
+                        // Truncate long names for better display
+                        return value.length > 10
+                            ? `${value.substring(0, 10)}...`
+                            : value;
+                      }}
                   />
-                </Pie>
-              </PieChart>
+                  <ChartTooltip
+                      cursor={false}
+                      content={<ChartTooltipContent hideLabel />}
+                  />
+                  <Bar
+                      dataKey="votes"
+                      strokeWidth={2}
+                      radius={8}
+                      activeIndex={0} // Highlight the winner (first in sorted array)
+                      activeBar={({ ...props }) => {
+                        return (
+                            <Rectangle
+                                {...props}
+                                fillOpacity={0.8}
+                                stroke={props.payload.fill}
+                                strokeDasharray={4}
+                                strokeDashoffset={4}
+                            />
+                        );
+                      }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
-          <CardFooter className="flex-col gap-2 text-sm">
+          <CardFooter className="flex-col items-center gap-2 text-sm">
             {winnerInfo && (
-              <>
-                <div className="flex items-center gap-2 leading-none font-medium text-green-600">
-                  <TrendingUp className="h-4 w-4" />
-                  {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
-                  of votes
-                </div>
-                <div className="text-muted-foreground leading-none text-center">
-                  {totalVotes} total votes cast in {activeCategory}
-                </div>
-              </>
+                <>
+                  <div className="flex gap-2 leading-none font-medium text-green-600">
+                    <TrendingUp className="h-4 w-4" />
+                    {winnerInfo.winner.name} leads with {winnerInfo.percentage}% of
+                    votes
+                  </div>
+                  <div className="text-muted-foreground leading-none">
+                    {totalVotes} total votes cast in {activeCategory}
+                  </div>
+                </>
             )}
           </CardFooter>
         </Card>
-      );
-    }
-
-    return (
-      <Card className="bg-gray-50 dark:bg-gray-900">
-        <CardHeader>
-          <CardTitle className="text-lg">
-            {activeCategory} - Vote Distribution
-          </CardTitle>
-          <CardDescription>
-            Election Results for {activeCategory}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                maxBarSize={60} // Reduced bar width
-              >
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="name"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tickFormatter={(value) => {
-                    // Truncate long names for better display
-                    return value.length > 10
-                      ? `${value.substring(0, 10)}...`
-                      : value;
-                  }}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent hideLabel />}
-                />
-                <Bar
-                  dataKey="votes"
-                  strokeWidth={2}
-                  radius={8}
-                  activeIndex={0} // Highlight the winner (first in sorted array)
-                  activeBar={({ ...props }) => {
-                    return (
-                      <Rectangle
-                        {...props}
-                        fillOpacity={0.8}
-                        stroke={props.payload.fill}
-                        strokeDasharray={4}
-                        strokeDashoffset={4}
-                      />
-                    );
-                  }}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </CardContent>
-        <CardFooter className="flex-col items-start gap-2 text-sm">
-          {winnerInfo && (
-            <>
-              <div className="flex gap-2 leading-none font-medium text-green-600">
-                <TrendingUp className="h-4 w-4" />
-                {winnerInfo.winner.name} leads with {winnerInfo.percentage}% of
-                votes
-              </div>
-              <div className="text-muted-foreground leading-none">
-                {totalVotes} total votes cast in {activeCategory}
-              </div>
-            </>
-          )}
-        </CardFooter>
-      </Card>
     );
   };
 
+  // If showCategoryTabs is false, render only the chart with chart type toggle
   if (!showCategoryTabs) {
     return (
-      <div className="space-y-4">
-        {/* Chart Type Toggle */}
-        {showChartTypeToggle && (
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              variant={chartType === "pie" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setChartType("pie")}
-              className="flex items-center gap-2"
-            >
-              <PieChartIcon className="w-4 h-4" />
-              Pie Chart
-            </Button>
-            <Button
-              variant={chartType === "bar" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setChartType("bar")}
-              className="flex items-center gap-2"
-            >
-              <BarChart3 className="w-4 h-4" />
-              Bar Chart
-            </Button>
-          </div>
-        )}
-        {renderChart()}
-      </div>
+        <div className="space-y-4">
+          {/* Chart Type Toggle */}
+          {showChartTypeToggle && (
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                    variant={chartType === "pie" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setChartType("pie")}
+                    className="flex items-center gap-2 cursor-pointer"
+                >
+                  <PieChartIcon className="w-4 h-4" />
+                  Pie Chart
+                </Button>
+                <Button
+                    variant={chartType === "bar" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setChartType("bar")}
+                    className="flex items-center gap-2 cursor-pointer"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Bar Chart
+                </Button>
+              </div>
+          )}
+          {renderChart()}
+        </div>
     );
   }
 
+  // Original implementation with category tabs (for backward compatibility)
   return (
-    <div className="space-y-4">
-      {/* Category Selection */}
-      <Tabs value={activeCategory} onValueChange={handleCategoryChange}>
-        <div className="flex items-center justify-between mb-4">
-          <TabsList
-            className={cn("bg-gray-100 dark:bg-gray-800", customTabsClassName)}
-          >
-            {election.categories.map((category) => (
-              <TabsTrigger
-                key={category}
-                value={category}
-                className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white"
-              >
-                {category}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      <div className="space-y-4">
+        {/* Category Selection */}
+        <Tabs value={activeCategory} onValueChange={handleCategoryChange}>
+          <div className="flex items-center justify-between mb-4">
+            <TabsList
+                className={cn("bg-gray-100 dark:bg-gray-800", customTabsClassName)}
+            >
+              {election.categories.map((category) => (
+                  <TabsTrigger
+                      key={category}
+                      value={category}
+                      className="font-bold data-[state=active]:bg-indigo-600 data-[state=active]:text-white data-[state=active]:bg-gradient-to-tr from-[#254192] to-[#192E69]"
+                  >
+                    {category}
+                  </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {/* Chart Type Toggle */}
-          {showChartTypeToggle && (
-            <div className="flex items-center gap-2">
-              <Button
-                variant={chartType === "pie" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setChartType("pie")}
-                className="flex items-center gap-2"
-              >
-                <PieChartIcon className="w-4 h-4" />
-                Pie Chart
-              </Button>
-              <Button
-                variant={chartType === "bar" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setChartType("bar")}
-                className="flex items-center gap-2"
-              >
-                <BarChart3 className="w-4 h-4" />
-                Bar Chart
-              </Button>
-            </div>
-          )}
-        </div>
+            {/* Chart Type Toggle */}
+            {showChartTypeToggle && (
+                <div className="flex items-center gap-2">
+                  <Button
+                      variant={chartType === "pie" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setChartType("pie")}
+                      className="flex items-center gap-2"
+                  >
+                    <PieChartIcon className="w-4 h-4" />
+                    Pie Chart
+                  </Button>
+                  <Button
+                      variant={chartType === "bar" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setChartType("bar")}
+                      className="flex items-center gap-2"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Bar Chart
+                  </Button>
+                </div>
+            )}
+          </div>
 
-        {election.categories.map((category) => (
-          <TabsContent key={category} value={category} className="space-y-4">
-            {renderChart()}
-          </TabsContent>
-        ))}
-      </Tabs>
-    </div>
+          {election.categories.map((category) => (
+              <TabsContent key={category} value={category} className="space-y-4">
+                {renderChart()}
+              </TabsContent>
+          ))}
+        </Tabs>
+      </div>
   );
 };
 

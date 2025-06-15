@@ -68,7 +68,7 @@ export default function HeroSection() {
         <div className="flex flex-col justify-center items-center relative">
           {/* Main headline - optimized for LCP */}
           <div className="max-w-7xl px-4">
-            <h1 className="text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-[80px] leading-[1.1] lg:leading-none font-extrabold tracking-tight mb-6 text-main pt-8 text-gray-700 dark:text-white/90">
+            <h1 className="text-center text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-[80px] leading-[1.1] lg:leading-none font-extrabold tracking-tight mb-6 pt-8 text-gray-700 dark:text-white/90">
               {words.map((word, index) => (
                 <React.Fragment key={index}>
                   <span className="inline-block will-change-transform">

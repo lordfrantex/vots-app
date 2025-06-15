@@ -57,7 +57,7 @@ const ElectionClient: React.FC<ElectionClientProps> = ({ data }) => {
     abi,
     address: "0x62D560937ee50E24138aB37c75281E4531bf729F",
     functionName: "getElectionInfo",
-    args: [1n],
+    args: [3n],
     // Pass the connected wallet address
   });
 
@@ -116,8 +116,8 @@ const ElectionClient: React.FC<ElectionClientProps> = ({ data }) => {
 
       <div className="flex items-center justify-between mb-8">
         <Button
-          onClick={() => router.push(`/elections/new`)}
-          className="cursor-pointer bg-[#364153] dark:bg-white hover:bg-gradient-to-tr hover:from-zinc-700 hover:via-55% hover:to-gray-500 hover:text-white"
+          onClick={() => router.push(`/create-election`)}
+          className="cursor-pointer bg-gray-700 dark:bg-white hover:bg-gradient-to-tr hover:from-zinc-700 hover:via-55% hover:to-gray-500 hover:text-white"
         >
           <Plus className="mr-2 h-4 w-4" />
           Add New

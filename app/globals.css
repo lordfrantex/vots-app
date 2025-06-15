@@ -45,6 +45,8 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --gradient-dark-bg: linear-gradient(to right, #10091a 0%, #06101e 100%);
+
+  --color-main: rgba(98, 104, 119, 0.83);
 }
 
 :root {
@@ -138,4 +140,15 @@
     display: none;               /* Chrome, Safari */
   }
 
+  /* Glassmorphism Effects */
+  .glass-panel {
+    background: rgba(23, 22, 22, 0.04);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .dark .glass-panel {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }
