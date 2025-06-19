@@ -8,7 +8,7 @@ const walletAddressSchema = z
 
 const dateTimeSchema = z
   .string()
-  .min(1, "Date and time must be greater than current time")
+  .min(1, "Date and time must be in the future")
   .refine(
     (date) => new Date(date) > new Date(),
     "Date and time must be in the future",
@@ -92,7 +92,7 @@ export const createCandidatesSchema = (validCategories: string[]) =>
               .max(50, "Candidate name must not exceed 50 characters")
               .regex(
                 /^[a-zA-Z\s.-]+$/,
-                "Candidate name contains invalid characters",
+                "Candidate name can only contain letters, spaces, dots, and hyphens",
               ),
             candidateId: z
               .string()
@@ -100,7 +100,7 @@ export const createCandidatesSchema = (validCategories: string[]) =>
               .max(20, "Candidate ID must not exceed 20 characters")
               .regex(
                 /^[a-zA-Z0-9/-_]+$/,
-                "Candidate ID can only contain letters, numbers, hyphens,backlash and underscores",
+                "Candidate ID can only contain letters, numbers, hyphens, forward slash, and underscores",
               ),
             category: z.enum(validCategories as [string, ...string[]], {
               errorMap: () => ({ message: "Please select a valid category" }),
@@ -108,17 +108,33 @@ export const createCandidatesSchema = (validCategories: string[]) =>
             photo: z.string().optional(),
           }),
         )
-        .min(1, "At least one candidate is required"),
+        .min(1, "At least one candidate is required")
+        .max(100, "Maximum 100 candidates allowed"),
     })
     .refine(
       (data) => {
         const candidateIds = data.candidates.map((c) =>
-          c.candidateId.toLowerCase(),
+          c.candidateId.toLowerCase().trim(),
         );
-        return new Set(candidateIds).size === candidateIds.length;
+        const uniqueIds = new Set(candidateIds);
+        return uniqueIds.size === candidateIds.length;
       },
       {
-        message: "Candidate IDs must be unique",
+        message:
+          "All candidate IDs must be unique. Duplicate IDs found - please use unique identifiers like matric numbers or student IDs",
+        path: ["candidates"],
+      },
+    )
+    .refine(
+      (data) => {
+        const candidateNames = data.candidates.map((c) =>
+          c.name.toLowerCase().trim(),
+        );
+        const uniqueNames = new Set(candidateNames);
+        return uniqueNames.size === candidateNames.length;
+      },
+      {
+        message: "All candidate names must be unique. Duplicate names found",
         path: ["candidates"],
       },
     )
@@ -128,15 +144,86 @@ export const createCandidatesSchema = (validCategories: string[]) =>
         const categoriesWithCandidates = new Set(
           data.candidates.map((c) => c.category),
         );
-        return validCategories.every((cat) =>
-          categoriesWithCandidates.has(cat),
+        const missingCategories = validCategories.filter(
+          (cat) => !categoriesWithCandidates.has(cat),
         );
+        return missingCategories.length === 0;
       },
       {
-        message: "Each category must have at least one candidate",
+        message: "Each position category must have at least one candidate",
+        path: ["candidates"],
+      },
+    )
+    .refine(
+      (data) => {
+        // Check that no category has too many candidates (optional business rule)
+        const categoryCount: Record<string, number> = {};
+        data.candidates.forEach((candidate) => {
+          categoryCount[candidate.category] =
+            (categoryCount[candidate.category] || 0) + 1;
+        });
+
+        // Allow up to 20 candidates per category
+        const maxCandidatesPerCategory = 20;
+        const overloadedCategories = Object.entries(categoryCount)
+          .filter(([, count]) => count > maxCandidatesPerCategory)
+          .map(([category]) => category);
+
+        return overloadedCategories.length === 0;
+      },
+      {
+        message: `Each category can have a maximum of 20 candidates`,
         path: ["candidates"],
       },
     );
+
+// Voters Schema
+export const votersSchema = z
+  .object({
+    voters: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z
+            .string()
+            .min(2, "Voter name must be at least 2 characters")
+            .max(50, "Voter name must not exceed 50 characters")
+            .regex(/^[a-zA-Z\s.-]+$/, "Voter name contains invalid characters"),
+          matricNumber: z
+            .string()
+            .min(3, "Matric number must be at least 3 characters")
+            .max(20, "Matric number must not exceed 20 characters")
+            .regex(
+              /^[a-zA-Z0-9/-]+$/,
+              "Matric number contains invalid characters",
+            ),
+          email: z
+            .string()
+            .email("Invalid email address")
+            .optional()
+            .or(z.literal("")),
+          department: z
+            .string()
+            .max(50, "Department name must not exceed 50 characters")
+            .optional()
+            .or(z.literal("")),
+        }),
+      )
+      .min(1, "At least one voter is required")
+      .max(10000, "Maximum 10,000 voters allowed"),
+  })
+  .refine(
+    (data) => {
+      const matricNumbers = data.voters.map((v) =>
+        v.matricNumber.toLowerCase(),
+      );
+      return new Set(matricNumbers).size === matricNumbers.length;
+    },
+    {
+      message: "Matric numbers must be unique",
+      path: ["voters"],
+    },
+  );
 
 // Polling Setup Schema
 export const pollingSetupSchema = z.object({
@@ -180,7 +267,27 @@ export type CategoriesFormData = z.infer<typeof categoriesSchema>;
 export type CandidatesFormData = z.infer<
   ReturnType<typeof createCandidatesSchema>
 >;
+export type VotersFormData = z.infer<typeof votersSchema>;
 export type PollingSetupFormData = z.infer<typeof pollingSetupSchema>;
 export type CompleteElectionData = z.infer<
   ReturnType<typeof createCompleteElectionSchema>
 >;
+
+// Helper function to get duplicate candidate IDs for better error reporting
+export const findDuplicateCandidateIds = (
+  candidates: Array<{ candidateId: string }>,
+) => {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+
+  candidates.forEach((candidate) => {
+    const id = candidate.candidateId.toLowerCase().trim();
+    if (seen.has(id)) {
+      duplicates.add(id);
+    } else {
+      seen.add(id);
+    }
+  });
+
+  return Array.from(duplicates);
+};

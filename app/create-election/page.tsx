@@ -10,6 +10,7 @@ import { CategoriesForm } from "@/components/layouts/create-election/categories-
 import { CandidatesForm } from "@/components/layouts/create-election/candidates-form";
 import { PollingSetupForm } from "@/components/layouts/create-election/polling-setup-form";
 import { ReviewSummary } from "@/components/layouts/create-election/review-summary";
+import { VotersForm } from "@/components/layouts/create-election/voters-form";
 
 const steps = [
   { id: "basic", title: "Basic Info", icon: Vote },
@@ -140,7 +141,15 @@ export default function CreateElectionPage() {
                   isValid={validationState.candidates}
                 />
               </div>
-
+              <div ref={setRef("voters")}>
+                <VotersForm
+                  form={forms.voters}
+                  isExpanded={expandedSections.has("voters")}
+                  onToggle={() => toggleSection("voters")}
+                  canAccess={canAccessSection("voters")}
+                  isValid={validationState.voters}
+                />
+              </div>
               <div ref={setRef("polling")}>
                 <PollingSetupForm
                   form={forms.polling}

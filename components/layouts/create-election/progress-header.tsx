@@ -71,7 +71,7 @@ export function ProgressHeader({
   };
 
   return (
-    <div className="glass-panel border-b border-white/10 sticky top-18 z-50 pb-4 ">
+    <div className="glass-panel border-b border-white/10 sticky top-18 z-30 pb-4 ">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between mb-4">
           <Heading
@@ -98,16 +98,19 @@ export function ProgressHeader({
               "flex items-center space-x-2 px-3 py-2 rounded-lg transition-all cursor-pointer";
 
             if (stepState === "completed") {
-              className += " text-indigo-400 hover:bg-indigo-500/10";
+              className +=
+                " text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10";
             } else if (stepState === "current") {
               className += " bg-blue-500/20 text-blue-600 dark:text-blue-400";
             } else if (
               stepState === "available" &&
               index <= highestAccessible
             ) {
-              className += " text-gray-300 hover:bg-gray-500/10";
+              className +=
+                " text-gray-600 dark:text-gray-300 hover:bg-gray-500/10";
             } else {
-              className += " text-gray-600 cursor-not-allowed";
+              className +=
+                " text-gray-400 dark:text-gray-600 cursor-not-allowed";
             }
 
             return (

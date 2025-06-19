@@ -13,12 +13,15 @@ import {
   type CategoriesFormData,
   type CandidatesFormData,
   type PollingSetupFormData,
+  votersSchema,
+  VotersFormData,
 } from "@/lib/validation-schemas";
 
 export interface ValidationState {
   basicInfo: boolean;
   categories: boolean;
   candidates: boolean;
+  voters: boolean;
   polling: boolean;
   complete: boolean;
 }
@@ -46,6 +49,7 @@ export function useElectionValidation() {
     basicInfo: false,
     categories: false,
     candidates: false,
+    voters: false,
     polling: false,
     complete: false,
   });
@@ -91,6 +95,15 @@ export function useElectionValidation() {
     },
   });
 
+  // Voters Form
+  const votersForm = useForm<VotersFormData>({
+    resolver: zodResolver(votersSchema),
+    mode: "onChange",
+    defaultValues: {
+      voters: [],
+    },
+  });
+
   // Polling Setup Form
   const pollingForm = useForm<PollingSetupFormData>({
     resolver: zodResolver(pollingSetupSchema),
@@ -109,6 +122,9 @@ export function useElectionValidation() {
     const candidatesValid =
       candidatesForm.formState.isValid &&
       candidatesForm.getValues("candidates").length > 0;
+    const votersValid =
+      votersForm.formState.isValid && votersForm.getValues("voters").length > 0;
+
     const pollingValid =
       pollingForm.formState.isValid &&
       pollingForm.getValues("pollingOfficers").length > 0 &&
@@ -118,6 +134,8 @@ export function useElectionValidation() {
       basicInfo: basicInfoValid,
       categories: categoriesValid && basicInfoValid,
       candidates: candidatesValid && categoriesValid && basicInfoValid,
+      voters:
+        votersValid && candidatesValid && categoriesValid && basicInfoValid,
       polling:
         pollingValid && candidatesValid && categoriesValid && basicInfoValid,
       complete:
@@ -139,6 +157,7 @@ export function useElectionValidation() {
     basicInfoForm.formState.isValid,
     categoriesForm.formState.isValid,
     candidatesForm.formState.isValid,
+    votersForm.formState.isValid,
     pollingForm.formState.isValid,
     validCategories.length,
   ]);
@@ -195,6 +214,7 @@ export function useElectionValidation() {
       basicInfo: basicInfoForm.getValues(),
       categories: categoriesForm.getValues(),
       candidates: candidatesForm.getValues(),
+      voters: votersForm.getValues(),
       polling: pollingForm.getValues(),
     };
 
@@ -208,6 +228,7 @@ export function useElectionValidation() {
     basicInfoForm,
     categoriesForm,
     candidatesForm,
+    votersForm,
     pollingForm,
     validCategories,
   ]);
@@ -222,8 +243,10 @@ export function useElectionValidation() {
           return validationState.basicInfo;
         case "candidates":
           return validationState.categories && validCategories.length > 0;
-        case "polling":
+        case "voters":
           return validationState.candidates;
+        case "polling":
+          return validationState.voters;
         case "complete":
           return validationState.polling;
         default:
@@ -238,6 +261,7 @@ export function useElectionValidation() {
       basicInfo: basicInfoForm,
       categories: categoriesForm,
       candidates: candidatesForm,
+      voters: votersForm,
       polling: pollingForm,
     },
     validationState,

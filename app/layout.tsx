@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css";
 import Navbar from "@/components/navbar/navbar";
 import Footer from "@/components/footer/footer";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import App from "@/app/App";
+
+import "./globals.css";
 
 const interVariable = Inter({
   variable: "--font-inter-sans",
