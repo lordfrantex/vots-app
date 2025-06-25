@@ -78,7 +78,7 @@ export const categoriesSchema = z
     },
   );
 
-// Candidates Schema (depends on categories)
+// Candidates Schema (depends on categories) - uses matricNo
 export const createCandidatesSchema = (validCategories: string[]) =>
   z
     .object({
@@ -94,13 +94,13 @@ export const createCandidatesSchema = (validCategories: string[]) =>
                 /^[a-zA-Z\s.-]+$/,
                 "Candidate name can only contain letters, spaces, dots, and hyphens",
               ),
-            candidateId: z
+            matricNo: z
               .string()
-              .min(3, "Candidate ID must be at least 3 characters")
-              .max(20, "Candidate ID must not exceed 20 characters")
+              .min(3, "Matric number must be at least 3 characters")
+              .max(20, "Matric number must not exceed 20 characters")
               .regex(
                 /^[a-zA-Z0-9/-_]+$/,
-                "Candidate ID can only contain letters, numbers, hyphens, forward slash, and underscores",
+                "Matric number can only contain letters, numbers, hyphens, forward slash, and underscores",
               ),
             category: z.enum(validCategories as [string, ...string[]], {
               errorMap: () => ({ message: "Please select a valid category" }),
@@ -113,15 +113,15 @@ export const createCandidatesSchema = (validCategories: string[]) =>
     })
     .refine(
       (data) => {
-        const candidateIds = data.candidates.map((c) =>
-          c.candidateId.toLowerCase().trim(),
+        const matricNos = data.candidates.map((c) =>
+          c.matricNo.toLowerCase().trim(),
         );
-        const uniqueIds = new Set(candidateIds);
-        return uniqueIds.size === candidateIds.length;
+        const uniqueMatricNos = new Set(matricNos);
+        return uniqueMatricNos.size === matricNos.length;
       },
       {
         message:
-          "All candidate IDs must be unique. Duplicate IDs found - please use unique identifiers like matric numbers or student IDs",
+          "All candidate matric numbers must be unique. Duplicate matric numbers found - please use unique identifiers like matric numbers or student IDs",
         path: ["candidates"],
       },
     )
@@ -177,7 +177,7 @@ export const createCandidatesSchema = (validCategories: string[]) =>
       },
     );
 
-// Voters Schema
+// Voters Schema - uses matricNumber (different from candidates)
 export const votersSchema = z
   .object({
     voters: z
@@ -258,6 +258,7 @@ export const createCompleteElectionSchema = (validCategories: string[]) =>
     basicInfo: basicInfoSchema,
     categories: categoriesSchema,
     candidates: createCandidatesSchema(validCategories),
+    voters: votersSchema,
     polling: pollingSetupSchema,
   });
 
@@ -275,13 +276,13 @@ export type CompleteElectionData = z.infer<
 
 // Helper function to get duplicate candidate IDs for better error reporting
 export const findDuplicateCandidateIds = (
-  candidates: Array<{ candidateId: string }>,
+  candidates: Array<{ matricNo: string }>,
 ) => {
   const seen = new Set<string>();
   const duplicates = new Set<string>();
 
   candidates.forEach((candidate) => {
-    const id = candidate.candidateId.toLowerCase().trim();
+    const id = candidate.matricNo.toLowerCase().trim();
     if (seen.has(id)) {
       duplicates.add(id);
     } else {

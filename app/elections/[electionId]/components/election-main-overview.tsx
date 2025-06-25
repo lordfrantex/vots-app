@@ -1,5 +1,5 @@
-import React from "react";
-import { Election } from "@/types/election";
+import type React from "react";
+import type { Election } from "@/types/election";
 import StatusBadge from "@/components/utilities/status-badge";
 import CountdownTimer from "@/components/ui/countdown-timer";
 import StatCard from "@/app/elections/[electionId]/components/election-stat-card";
@@ -18,6 +18,7 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
   if (!election) {
     return null;
   }
+
   const turnoutPercentage =
     (election?.totalVoters ?? 0) > 0
       ? (
@@ -26,8 +27,14 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
         ).toFixed(1)
       : "0.0";
 
-  const targetDate =
-    election?.status === "UPCOMING" ? election.startTime : election.endTime;
+  // Convert string dates to Date objects
+  const startDate = election.startDate
+    ? new Date(election.startDate)
+    : undefined;
+  const endDate = election.endDate ? new Date(election.endDate) : undefined;
+
+  // Determine target date based on election status
+  const targetDate = election?.status === "UPCOMING" ? startDate : endDate;
 
   return (
     <div
@@ -49,11 +56,13 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
       <Separator />
 
       {/* Countdown Timer */}
-      <CountdownTimer
-        targetDate={targetDate}
-        status={election.status}
-        isStartDate={election.status === "UPCOMING"}
-      />
+      {targetDate && (
+        <CountdownTimer
+          targetDate={targetDate}
+          status={election.status}
+          isStartDate={election.status === "UPCOMING"}
+        />
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">

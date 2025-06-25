@@ -1,11 +1,12 @@
 "use client";
-import React from "react";
+import type React from "react";
 import { Calendar, Users } from "lucide-react";
-import { Election } from "@/types/election";
+import type { Election } from "@/types/election";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { getStatusBadge } from "@/components/utilities/status-badge";
+import { formatDate } from "@/lib/utils";
 
 interface ElectionCardProps {
   election: Election;
@@ -37,14 +38,6 @@ const ElectionCard: React.FC<ElectionCardProps> = ({ election }) => {
       default:
         return "View Election";
     }
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
   };
 
   const { theme } = useTheme();
@@ -89,7 +82,7 @@ const ElectionCard: React.FC<ElectionCardProps> = ({ election }) => {
             <span
               className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}
             >
-              Starts: {formatDate(election.startTime)}
+              Starts: {formatDate(election?.startDate)}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -99,7 +92,7 @@ const ElectionCard: React.FC<ElectionCardProps> = ({ election }) => {
             <span
               className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-600"}`}
             >
-              Ends: {formatDate(election.endTime)}
+              Ends: {formatDate(election.endDate)}
             </span>
           </div>
         </div>

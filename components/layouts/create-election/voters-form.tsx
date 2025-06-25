@@ -225,6 +225,8 @@ export function VotersForm({
     .map((error) => error?.message)
     .filter(Boolean) as string[];
 
+  // canAccess = true;
+
   return (
     <FormSectionWrapper
       isValid={isValid}

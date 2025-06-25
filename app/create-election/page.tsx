@@ -1,32 +1,62 @@
 "use client";
-
-import { useState, useCallback, useRef } from "react";
-import { Vote, Users, CheckCircle } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import {
+  Vote,
+  Users,
+  CheckCircle,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+} from "wagmi";
+import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 
 import { useElectionValidation } from "@/hooks/use-election-validation";
 import { ProgressHeader } from "@/components/layouts/create-election/progress-header";
 import { BasicInfoForm } from "@/components/layouts/create-election/basic-info-form";
 import { CategoriesForm } from "@/components/layouts/create-election/categories-form";
 import { CandidatesForm } from "@/components/layouts/create-election/candidates-form";
-import { PollingSetupForm } from "@/components/layouts/create-election/polling-setup-form";
 import { ReviewSummary } from "@/components/layouts/create-election/review-summary";
 import { VotersForm } from "@/components/layouts/create-election/voters-form";
+import { PollingSetupForm } from "@/components/layouts/create-election/polling-setup-form";
+import { abi } from "@/contracts/abi";
+import { electionAddress } from "@/contracts/election-address";
+import {
+  convertToContractArgs,
+  validateContractArgs,
+} from "@/utils/contract-helpers";
 
 const steps = [
   { id: "basic", title: "Basic Info", icon: Vote },
   { id: "categories", title: "Categories", icon: Users },
   { id: "candidates", title: "Candidates", icon: Users },
+  { id: "voters", title: "Voters", icon: Users },
   { id: "polling", title: "Polling Setup", icon: CheckCircle },
   { id: "review", title: "Review", icon: CheckCircle },
 ];
 
-const sectionIds = ["basic", "categories", "candidates", "polling", "review"];
+const sectionIds = [
+  "basic",
+  "categories",
+  "candidates",
+  "voters",
+  "polling",
+  "review",
+];
 
 export default function CreateElectionPage() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["basic"]),
   );
-  // Fix: Use proper ref typing for HTMLDivElement
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [walletCheckLoading, setWalletCheckLoading] = useState(true);
+
+  const router = useRouter();
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const {
@@ -38,6 +68,35 @@ export default function CreateElectionPage() {
     validateCompleteElection,
     canAccessSection,
   } = useElectionValidation();
+
+  // Wagmi hooks for contract interaction
+  const { address, isConnected, isConnecting } = useAccount();
+  const {
+    writeContract,
+    isPending: isWritePending,
+    error: writeError,
+    data: writeData,
+  } = useWriteContract();
+
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    error: confirmError,
+  } = useWaitForTransactionReceipt({
+    hash: txHash,
+  });
+
+  // Wallet connection check effect
+  useEffect(() => {
+    const checkWallet = async () => {
+      setWalletCheckLoading(true);
+      // Simulate checking wallet connection
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setWalletCheckLoading(false);
+    };
+
+    checkWallet();
+  }, []);
 
   const toggleSection = useCallback(
     (sectionId: string) => {
@@ -55,14 +114,9 @@ export default function CreateElectionPage() {
   const handleStepClick = useCallback(
     (stepIndex: number) => {
       const sectionId = sectionIds[stepIndex];
-
-      // Update current step
       setCurrentStep(stepIndex);
-
-      // Expand the target section
       setExpandedSections((prev) => new Set([...prev, sectionId]));
 
-      // Scroll to the section
       const sectionRef = sectionRefs.current[sectionId];
       if (sectionRef) {
         sectionRef.scrollIntoView({
@@ -75,24 +129,194 @@ export default function CreateElectionPage() {
     [setCurrentStep],
   );
 
-  const handleSubmit = useCallback(() => {
-    const validation = validateCompleteElection();
-    if (validation.success) {
-      console.log("Submitting election data:", validation.data);
-      // Here you would call your useWriteContract hook
-      // const { writeContract } = useWriteContract()
-      // writeContract({
-      //   functionName: 'createElection',
-      //   args: [validation.data]
-      // })
-    } else {
-      console.error("Validation errors:", validation.errors);
+  const handleSubmit = useCallback(async () => {
+    // Check wallet connection first
+    if (!isConnected || !address) {
+      toast.error("Please connect your wallet to create an election.");
+      return;
     }
-  }, [validateCompleteElection]);
 
-  // Helper function to set refs properly
+    const validation = validateCompleteElection();
+
+    if (!validation.success || !validation.data) {
+      console.error("Validation errors:", validation.errors);
+      toast.error("Please complete all required fields before submitting.");
+      return;
+    }
+
+    // Show loading toast
+    const loadingToastId = toast.loading("Creating election...");
+
+    try {
+      console.log("=== ELECTION CREATION DEBUG ===");
+      console.log("1. Original validation data:", validation.data);
+
+      // Convert frontend data to contract format
+      const contractArgs = convertToContractArgs(validation.data);
+      console.log("2. Converted contract args:", contractArgs);
+
+      // Validate contract arguments
+      const contractValidation = validateContractArgs(contractArgs);
+      console.log("3. Contract validation result:", contractValidation);
+
+      if (!contractValidation.isValid) {
+        console.error("Contract validation errors:", contractValidation.errors);
+        toast.error(
+          "Contract validation failed: " + contractValidation.errors.join(", "),
+          {
+            id: loadingToastId,
+          },
+        );
+        return;
+      }
+
+      console.log("4. Calling writeContract with:");
+      console.log("   - Address:", electionAddress);
+      console.log("   - Function:", "createElection");
+      console.log("   - Args length:", contractArgs.length);
+
+      // Type-safe contract call
+      writeContract(
+        {
+          address: electionAddress as `0x${string}`,
+          abi: abi,
+          functionName: "createElection",
+          args: contractArgs,
+        },
+        {
+          onSuccess: (hash) => {
+            console.log("5. Contract write successful:", hash);
+            setTxHash(hash);
+            toast.success(
+              "Transaction submitted! 📝 Waiting for confirmation...",
+              {
+                id: loadingToastId,
+              },
+            );
+          },
+          onError: (error) => {
+            console.error("5. Contract write error:", error);
+            toast.error(
+              "Failed to create election: " +
+                (error.message || "Unknown error"),
+              {
+                id: loadingToastId,
+              },
+            );
+          },
+        },
+      );
+    } catch (error) {
+      console.error("Unexpected error creating election:", error);
+      toast.error(
+        "Unexpected error: " +
+          (error instanceof Error ? error.message : "Please try again."),
+        {
+          id: loadingToastId,
+        },
+      );
+    }
+  }, [validateCompleteElection, writeContract, isConnected, address]);
+
+  // Handle transaction confirmation and redirect
+  useEffect(() => {
+    if (isConfirmed && txHash) {
+      toast.success(
+        "🎉 Election created successfully! Redirecting to elections page...",
+        {
+          duration: 3000,
+        },
+      );
+
+      console.log("Transaction confirmed:", txHash);
+
+      // Redirect to elections page after showing success message
+      setTimeout(() => {
+        router.push("/elections");
+        // Optional: Refresh the page to ensure fresh data
+        setTimeout(() => {
+          window.location.reload();
+        }, 100);
+      }, 2000); // Wait 2 seconds to let user see the success message
+    }
+  }, [isConfirmed, txHash, router]);
+
+  // Handle write data changes
+  useEffect(() => {
+    if (writeData && !txHash) {
+      setTxHash(writeData);
+    }
+  }, [writeData, txHash]);
+
+  // Handle errors
+  useEffect(() => {
+    if (writeError) {
+      console.error("Write error:", writeError);
+      toast.error(
+        "Transaction failed: " + (writeError.message || "Please try again"),
+      );
+    }
+  }, [writeError]);
+
+  useEffect(() => {
+    if (confirmError) {
+      console.error("Confirmation error:", confirmError);
+      toast.error(
+        "Transaction confirmation failed: " +
+          (confirmError.message || "Please check your transaction"),
+      );
+    }
+  }, [confirmError]);
+
   const setRef = (sectionId: string) => (el: HTMLDivElement | null) => {
     sectionRefs.current[sectionId] = el;
+  };
+
+  const isSubmitting = isWritePending || isConfirming;
+
+  // Wallet connection status component
+  const WalletConnectionStatus = () => {
+    if (walletCheckLoading || isConnecting) {
+      return (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            <p className="text-blue-800 dark:text-blue-200">
+              Checking wallet connection...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!isConnected) {
+      return (
+        <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            <p className="text-yellow-800 dark:text-yellow-200">
+              Please connect your wallet to create an election.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div>
+            <p className="text-green-800 dark:text-green-200 font-medium">
+              ✅ Wallet Connected
+            </p>
+            <p className="text-green-600 dark:text-green-300 text-sm">
+              {address?.slice(0, 6)}...{address?.slice(-4)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -110,6 +334,9 @@ export default function CreateElectionPage() {
           />
 
           <div className="max-w-7xl mx-auto px-6 py-8">
+            {/* Enhanced Wallet Connection Status */}
+            <WalletConnectionStatus />
+
             <div className="space-y-6">
               <div ref={setRef("basic")}>
                 <BasicInfoForm
@@ -141,6 +368,7 @@ export default function CreateElectionPage() {
                   isValid={validationState.candidates}
                 />
               </div>
+
               <div ref={setRef("voters")}>
                 <VotersForm
                   form={forms.voters}
@@ -150,6 +378,7 @@ export default function CreateElectionPage() {
                   isValid={validationState.voters}
                 />
               </div>
+
               <div ref={setRef("polling")}>
                 <PollingSetupForm
                   form={forms.polling}
@@ -163,6 +392,8 @@ export default function CreateElectionPage() {
               <div ref={setRef("review")}>
                 <ReviewSummary
                   electionData={{
+                    id: "temp-id",
+                    status: "UPCOMING",
                     name: forms.basicInfo.getValues("name"),
                     description: forms.basicInfo.getValues("description"),
                     startDate: forms.basicInfo.getValues("startDate"),
@@ -170,6 +401,7 @@ export default function CreateElectionPage() {
                     timezone: forms.basicInfo.getValues("timezone"),
                     categories: forms.categories.getValues("categories"),
                     candidates: forms.candidates.getValues("candidates"),
+                    voters: forms.voters.getValues("voters"),
                     pollingOfficers: forms.polling.getValues("pollingOfficers"),
                     pollingUnits: forms.polling.getValues("pollingUnits"),
                   }}
@@ -178,6 +410,9 @@ export default function CreateElectionPage() {
                   onSubmit={handleSubmit}
                   canAccess={canAccessSection("complete")}
                   isValid={validationState.complete}
+                  isSubmitting={isSubmitting}
+                  txHash={txHash}
+                  isConfirmed={isConfirmed}
                 />
               </div>
             </div>

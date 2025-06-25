@@ -38,7 +38,12 @@ export const formatNumber = (num: number): string => {
   return num.toString().padStart(2, "0");
 };
 
-export const formatDate = (date: Date) => {
+export const formatDate = (input?: string | number | Date): string => {
+  if (!input) return "N/A";
+
+  const date = new Date(input);
+  if (isNaN(date.getTime())) return "Invalid Date";
+
   return (
     date.toLocaleDateString("en-US", {
       year: "numeric",

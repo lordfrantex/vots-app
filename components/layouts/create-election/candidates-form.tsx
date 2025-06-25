@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import type { UseFormReturn } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
-import { CandidatesFormData } from "@/lib/validation-schemas";
+import type { CandidatesFormData } from "@/lib/validation-schemas";
 import { FormSectionWrapper } from "@/components/layouts/create-election/form-section-wrapper";
 
 interface CandidatesFormProps {
@@ -59,7 +59,7 @@ export function CandidatesForm({
     append({
       id: Date.now().toString(),
       name: "",
-      candidateId: "",
+      matricNo: "",
       category: validCategories[0] || "",
     });
   };
@@ -86,9 +86,9 @@ export function CandidatesForm({
           if (candidate?.name?.message) {
             messages.push(`Candidate ${index + 1}: ${candidate.name.message}`);
           }
-          if (candidate?.candidateId?.message) {
+          if (candidate?.matricNo?.message) {
             messages.push(
-              `Candidate ${index + 1}: ${candidate.candidateId.message}`,
+              `Candidate ${index + 1}: ${candidate.matricNo.message}`,
             );
           }
           if (candidate?.category?.message) {
@@ -114,22 +114,19 @@ export function CandidatesForm({
   const watchedCandidates = watch("candidates");
 
   // Helper function to check if a candidate ID is duplicate
-  const isDuplicateId = (
-    currentIndex: number,
-    candidateId: string,
-  ): boolean => {
-    if (!candidateId || !watchedCandidates) return false;
+  const isDuplicateId = (currentIndex: number, matricNo: string): boolean => {
+    if (!matricNo || !watchedCandidates) return false;
 
     return watchedCandidates.some(
       (candidate, index) =>
         index !== currentIndex &&
-        candidate.candidateId?.toLowerCase() === candidateId.toLowerCase(),
+        candidate.matricNo?.toLowerCase() === matricNo.toLowerCase(),
     );
   };
 
   // Helper function to validate candidate ID on change
-  const handleCandidateIdChange = async (index: number, value: string) => {
-    setValue(`candidates.${index}.candidateId`, value, {
+  const handleMatricNoChange = async (index: number, value: string) => {
+    setValue(`candidates.${index}.matricNo`, value, {
       shouldValidate: false,
     });
 
@@ -213,9 +210,9 @@ export function CandidatesForm({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {fields.map((field, index) => {
-                const currentCandidateId =
-                  watch(`candidates.${index}.candidateId`) || "";
-                const isDuplicate = isDuplicateId(index, currentCandidateId);
+                const currentMatricNo =
+                  watch(`candidates.${index}.matricNo`) || "";
+                const isDuplicate = isDuplicateId(index, currentMatricNo);
 
                 return (
                   <div
@@ -264,29 +261,28 @@ export function CandidatesForm({
                       <div>
                         <Input
                           className={`bg-gray-50 ${
-                            errors.candidates?.[index]?.candidateId ||
-                            isDuplicate
+                            errors.candidates?.[index]?.matricNo || isDuplicate
                               ? "border-red-500"
                               : ""
                           }`}
-                          placeholder="Candidate ID (e.g., STU001, MAT12345)"
+                          placeholder="Matric Number (e.g., STU001, MAT12345)"
                           {...register(
-                            `candidates.${index}.candidateId` as const,
+                            `candidates.${index}.matricNo` as const,
                             {
                               onChange: (e) =>
-                                handleCandidateIdChange(index, e.target.value),
+                                handleMatricNoChange(index, e.target.value),
                             },
                           )}
                         />
-                        {errors.candidates?.[index]?.candidateId && (
+                        {errors.candidates?.[index]?.matricNo && (
                           <p className="text-red-400 text-sm mt-1">
-                            {errors.candidates[index]?.candidateId?.message}
+                            {errors.candidates[index]?.matricNo?.message}
                           </p>
                         )}
                         {isDuplicate &&
-                          !errors.candidates?.[index]?.candidateId && (
+                          !errors.candidates?.[index]?.matricNo && (
                             <p className="text-red-400 text-sm mt-1">
-                              This candidate ID is already used by another
+                              This matric number is already used by another
                               candidate
                             </p>
                           )}

@@ -1,6 +1,4 @@
-import React from "react";
 import ElectionClient from "@/components/layouts/elections/election-client";
-import mockElections from "@/constants/mock-elections";
 
 const ElectionsPage = () => {
   return (
@@ -10,10 +8,11 @@ const ElectionsPage = () => {
     >
       <div className="flex-col">
         <div className="flex-1 space-y-4 p-8 pt-6">
-          <ElectionClient data={mockElections} />
+          <ElectionClient />
         </div>
       </div>
     </section>
   );
 };
+
 export default ElectionsPage;

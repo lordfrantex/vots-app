@@ -14,7 +14,7 @@ import {
   type CandidatesFormData,
   type PollingSetupFormData,
   votersSchema,
-  VotersFormData,
+  type VotersFormData,
 } from "@/lib/validation-schemas";
 
 export interface ValidationState {
@@ -137,9 +137,17 @@ export function useElectionValidation() {
       voters:
         votersValid && candidatesValid && categoriesValid && basicInfoValid,
       polling:
-        pollingValid && candidatesValid && categoriesValid && basicInfoValid,
+        pollingValid &&
+        votersValid &&
+        candidatesValid &&
+        categoriesValid &&
+        basicInfoValid,
       complete:
-        basicInfoValid && categoriesValid && candidatesValid && pollingValid,
+        basicInfoValid &&
+        categoriesValid &&
+        candidatesValid &&
+        votersValid &&
+        pollingValid,
     };
 
     setValidationState(newValidationState);
@@ -148,8 +156,9 @@ export function useElectionValidation() {
     let newCurrentStep = 0;
     if (newValidationState.complete) newCurrentStep = 4;
     else if (newValidationState.polling) newCurrentStep = 4;
-    else if (newValidationState.candidates) newCurrentStep = 3;
-    else if (newValidationState.categories) newCurrentStep = 2;
+    else if (newValidationState.voters) newCurrentStep = 3;
+    else if (newValidationState.candidates) newCurrentStep = 2;
+    else if (newValidationState.categories) newCurrentStep = 1;
     else if (newValidationState.basicInfo) newCurrentStep = 1;
 
     setCurrentStep(newCurrentStep);
@@ -169,8 +178,8 @@ export function useElectionValidation() {
 
       // Use type guard to filter and map safely
       const validCategoryNames = categories
-        .filter(isValidCategory) // TypeScript now knows these have valid names
-        .map((cat) => cat.name.trim()); // No TypeScript error
+        .filter(isValidCategory)
+        .map((cat) => cat.name.trim());
 
       const categoriesString = JSON.stringify(validCategoryNames.sort());
 

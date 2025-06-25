@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import App from "@/app/App";
 
 import "./globals.css";
+import { ToastProvider } from "@/components/providers/toast-provider";
 
 const interVariable = Inter({
   variable: "--font-inter-sans",
@@ -34,6 +35,7 @@ export default function RootLayout({
           <App>
             <Navbar />
             {children}
+            <ToastProvider />
             <Footer />
           </App>
         </ThemeProvider>

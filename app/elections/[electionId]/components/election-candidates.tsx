@@ -1,19 +1,52 @@
 "use client";
 
-import { Election } from "@/types/election";
-import { Candidate } from "@/types/candidate";
-import { useState } from "react";
+import type React from "react";
+
+import type { Candidate } from "@/types/candidate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ElectionCandidateCard from "@/app/elections/[electionId]/components/election-candidate-card";
 import { cn } from "@/lib/utils";
+import { useElectionStore } from "@/store/use-election";
+import { useState, useEffect } from "react";
 
-const ElectionCandidates: React.FC<{ election: Election }> = ({ election }) => {
-  const [activeCategory, setActiveCategory] = useState(election.categories[0]);
+interface ElectionCandidatesProps {
+  electionId: string;
+}
+
+const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
+  electionId,
+}) => {
+  const { getElectionById } = useElectionStore();
+  const election = getElectionById(electionId);
+
+  // Safe initialization of activeCategory
+  const [activeCategory, setActiveCategory] = useState<string>("");
+
+  // Update activeCategory when election data is available
+  useEffect(() => {
+    if (election?.categories && election.categories.length > 0) {
+      // Handle both string array and Category object array
+      const firstCategory =
+        typeof election.categories[0] === "string"
+          ? election.categories[0]
+          : election.categories[0]?.name || "";
+      setActiveCategory(firstCategory);
+    }
+  }, [election?.categories]);
+
   if (!election) {
     return null;
   }
+
+  const candidates = election.candidates || [];
+
+  // Convert categories to string array for consistency
+  const categoryNames = election.categories.map((cat) =>
+    typeof cat === "string" ? cat : cat.name,
+  );
+
   // Group candidates by category
-  const candidatesByCategory = (election?.candidates ?? []).reduce(
+  const candidatesByCategory = candidates.reduce(
     (acc, candidate) => {
       if (!acc[candidate.category]) {
         acc[candidate.category] = [];
@@ -31,6 +64,19 @@ const ElectionCandidates: React.FC<{ election: Election }> = ({ election }) => {
         (a, b) => (b.voteCount || 0) - (a.voteCount || 0),
       );
     });
+  }
+
+  // Don't render if no categories available
+  if (categoryNames.length === 0) {
+    return (
+      <div className="mt-12">
+        <div className="text-center py-8">
+          <p className="text-gray-500 dark:text-gray-400">
+            No categories available for this election.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -66,12 +112,9 @@ const ElectionCandidates: React.FC<{ election: Election }> = ({ election }) => {
         </p>
       </div>
 
-      <Tabs
-        defaultValue={election.categories[0]}
-        onValueChange={setActiveCategory}
-      >
+      <Tabs value={activeCategory} onValueChange={setActiveCategory}>
         <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50">
-          {election.categories.map((category) => (
+          {categoryNames.map((category) => (
             <TabsTrigger
               key={category}
               value={category}
@@ -86,21 +129,24 @@ const ElectionCandidates: React.FC<{ election: Election }> = ({ election }) => {
           ))}
         </TabsList>
 
-        {election.categories.map((category) => (
+        {categoryNames.map((category) => (
           <TabsContent key={category} value={category}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-              {candidatesByCategory[category]?.map((candidate, index) => (
-                <ElectionCandidateCard
-                  key={candidate.id}
-                  candidate={candidate}
-                  electionStatus={election.status}
-                  isLeading={
-                    index === 0 &&
-                    election.status === "COMPLETED" &&
-                    (candidate.voteCount || 0) > 0
-                  }
-                />
-              )) || (
+              {candidatesByCategory[category] &&
+              candidatesByCategory[category].length > 0 ? (
+                candidatesByCategory[category].map((candidate, index) => (
+                  <ElectionCandidateCard
+                    key={candidate.id}
+                    candidate={candidate}
+                    electionStatus={election.status}
+                    isLeading={
+                      index === 0 &&
+                      election.status === "COMPLETED" &&
+                      (candidate.voteCount || 0) > 0
+                    }
+                  />
+                ))
+              ) : (
                 <div className="col-span-full text-center py-8">
                   <p className="text-gray-500 dark:text-gray-400">
                     No candidates registered for {category}

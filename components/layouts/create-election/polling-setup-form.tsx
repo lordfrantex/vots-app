@@ -10,10 +10,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FormSectionWrapper } from "@/components/layouts/create-election/form-section-wrapper";
+
 import type { UseFormReturn } from "react-hook-form";
 import { useFieldArray } from "react-hook-form";
 import type { PollingSetupFormData } from "@/lib/validation-schemas";
+import { FormSectionWrapper } from "@/components/layouts/create-election/form-section-wrapper";
 
 interface PollingSetupFormProps {
   form: UseFormReturn<PollingSetupFormData>;
@@ -66,6 +67,8 @@ export function PollingSetupForm({
     .map((error) => error?.message)
     .filter(Boolean) as string[];
 
+  // canAccess = true; // Assuming canAccess is always true for this example
+
   return (
     <FormSectionWrapper
       isValid={isValid}
@@ -73,10 +76,10 @@ export function PollingSetupForm({
       errors={errorMessages}
       title="Polling Setup"
     >
-      <Card className="glass-card">
+      <Card className="bg-gray-50 dark:bg-gray-900 py-6 rounded-lg shadow-lg shadow-gray-400/10 dark:shadow-2xl/25">
         <CardHeader className="cursor-pointer" onClick={onToggle}>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center space-x-3">
+            <CardTitle className="flex items-center space-x-3 text-xl text-gray-700 dark:text-gray-200">
               <CheckCircle className="w-5 h-5 text-purple-400" />
               <span>Polling Setup</span>
             </CardTitle>
@@ -94,13 +97,11 @@ export function PollingSetupForm({
               {/* Polling Officers */}
               <div className="glass-panel p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">
-                    Polling Officers
-                  </h3>
+                  <h3 className="text-lg font-semibold">Polling Officers</h3>
                   <Button
                     onClick={addPollingOfficer}
                     size="sm"
-                    className="neumorphic-button bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border-purple-500/30"
+                    className="neumorphic-button bg-purple-500/20 hover:bg-purple-500/30 text-purple-700 dark:text-purple-400 border-purple-500/30"
                     disabled={officerFields.length >= 20}
                   >
                     <Plus className="w-4 h-4 mr-1" />
@@ -155,13 +156,11 @@ export function PollingSetupForm({
               {/* Polling Units */}
               <div className="glass-panel p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">
-                    Polling Units
-                  </h3>
+                  <h3 className="text-lg font-semibold">Polling Units</h3>
                   <Button
                     onClick={addPollingUnit}
                     size="sm"
-                    className="neumorphic-button bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 border-purple-500/30"
+                    className="neumorphic-button bg-purple-500/20 hover:bg-purple-500/30 text-purple-700 dark:text-purple-400 border-purple-500/30"
                     disabled={unitFields.length >= 50}
                   >
                     <Plus className="w-4 h-4 mr-1" />

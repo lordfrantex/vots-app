@@ -1,23 +1,27 @@
 import { Candidate } from "@/types/candidate";
 import { Voter } from "@/types/voter";
+import { PollingOfficer } from "@/types/polling-officer";
+import { PollingUnit } from "@/types/polling-unit";
+import { Category } from "@/types/category";
 
 export interface Election {
   id: string;
   name: string;
-  startTime: Date;
-  endTime: Date;
+  startDate?: string;
+  endDate?: string;
+  timezone?: string;
 
   // Derived from contract data
   status: "ACTIVE" | "UPCOMING" | "COMPLETED";
-  categories: string[];
+  categories: Category[];
   totalVoters?: number;
   totalVotes?: number;
   candidates?: Candidate[];
   voters: Voter[];
 
   // Contract arrays (addresses)
-  pollingOfficers: string[];
-  pollingUnits: string[];
+  pollingOfficers: PollingOfficer[];
+  pollingUnits: PollingUnit[];
 
   // Your additional frontend-only fields (not in contract)
   description?: string;

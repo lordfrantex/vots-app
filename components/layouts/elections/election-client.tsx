@@ -1,67 +1,58 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Election } from "@/types/election";
-import Heading from "@/components/ui/heading";
+import React, { useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
+import Heading from "@/components/ui/heading";
 import FilterButtons from "@/components/ui/filter-button";
 import ElectionCard from "@/app/elections/components/election-cards";
 import ElectionSearchInput from "@/app/elections/components/election-search";
-import { useAccount, useBalance, useReadContract } from "wagmi";
+import { useAccount, useBalance } from "wagmi";
 import { formatEther } from "viem";
-import { abi } from "@/contracts/abi";
+import { useContractElections } from "@/hooks/use-contract-address";
+import { useElectionStore } from "@/store/use-election";
+import toast from "react-hot-toast";
 
-interface ElectionClientProps {
-  data: Election[];
-}
-
-const ElectionClient: React.FC<ElectionClientProps> = ({ data }) => {
+const ElectionClient: React.FC = () => {
   const { address, isConnected } = useAccount();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Use the connected wallet's address instead of hardcoded address
+  // Fetch elections from contract
+  const { elections, isLoading } = useContractElections();
+  const setElections = useElectionStore((state) => state.setElections);
+
+  useEffect(() => {
+    if (elections && elections.length > 0) {
+      setElections(elections);
+    }
+  }, [elections, setElections]);
+  console.log("Elections:", elections);
+
+  // Get wallet balance
   const {
     data: balance,
-    isError,
-    isLoading,
+    isError: balanceError,
+    isLoading: balanceLoading,
   } = useBalance({
-    address: address, // Use the connected wallet address
-    // You can also specify a token address for ERC-20 tokens:
-    // token: '0x...' // For ERC-20 token balance
+    address: address,
   });
 
-  // Alternative: Get balance for a specific address (like your hardcoded one)
-  const specificWalletBalance = useBalance({
-    address: "0x46b3B1AeB48C4f019f2CdEee6d053f5f4b8059B9" as `0x${string}`,
-  });
-
+  // Filter elections based on search query
   const filteredElections = useMemo(() => {
-    return data.filter((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    if (!elections) return [];
+    return elections.filter((election) =>
+      election.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  }, [searchQuery, data]);
+  }, [searchQuery, elections]);
 
   // Format balance for display
   const formattedBalance = balance
-    ? `${parseFloat(formatEther(balance.value)).toFixed(4)} ${balance.symbol}`
+    ? `${Number.parseFloat(formatEther(balance.value)).toFixed(4)} ${balance.symbol}`
     : "0";
 
-  const formattedSpecificBalance = specificWalletBalance.data
-    ? `${parseFloat(formatEther(specificWalletBalance.data.value)).toFixed(4)} ${specificWalletBalance.data.symbol}`
-    : "0";
-
-  const { data: electionData } = useReadContract({
-    abi,
-    address: "0x62D560937ee50E24138aB37c75281E4531bf729F",
-    functionName: "getElectionInfo",
-    args: [3n],
-    // Pass the connected wallet address
-  });
-
-  console.log("Election Data", electionData);
   return (
     <section className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-10">
@@ -82,9 +73,12 @@ const ElectionClient: React.FC<ElectionClientProps> = ({ data }) => {
               <span className="font-mono text-sm">{address}</span>
             </p>
 
-            {isLoading ? (
-              <p className="text-sm text-gray-500">Loading balance...</p>
-            ) : isError ? (
+            {balanceLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                <p className="text-sm text-gray-500">Loading balance...</p>
+              </div>
+            ) : balanceError ? (
               <p className="text-sm text-red-500">Error loading balance</p>
             ) : (
               <p className="text-sm font-medium">
@@ -97,20 +91,6 @@ const ElectionClient: React.FC<ElectionClientProps> = ({ data }) => {
               </p>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Optional: Display specific wallet balance */}
-      {specificWalletBalance.data && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6">
-          <p className="text-sm font-medium">
-            <span className="text-gray-600 dark:text-gray-400">
-              Specific Wallet Balance:
-            </span>{" "}
-            <span className="text-blue-600 dark:text-blue-400">
-              {formattedSpecificBalance}
-            </span>
-          </p>
         </div>
       )}
 
@@ -134,11 +114,19 @@ const ElectionClient: React.FC<ElectionClientProps> = ({ data }) => {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredElections.map((election) => (
-          <ElectionCard key={election.id} election={election} />
-        ))}
-      </div>
+      {/* Elections Grid or Loading Spinner */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="h-12 w-12 animate-spin text-gray-400 mb-4" />
+          {/*<p className="text-gray-500 text-lg">Loading elections...</p>*/}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredElections.map((election) => (
+            <ElectionCard key={election.id} election={election} />
+          ))}
+        </div>
+      )}
     </section>
   );
 };

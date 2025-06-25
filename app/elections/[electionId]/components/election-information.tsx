@@ -2,20 +2,26 @@
 
 import React from "react";
 import { Calendar, Lock, MapPin, Shield, Users } from "lucide-react";
-import { Election } from "@/types/election";
 import { Button } from "@/components/ui/button";
 import ElectionResult from "@/app/elections/[electionId]/components/election-result";
 import { formatDate } from "@/lib/utils";
+import { useElectionStore } from "@/store/use-election";
 
 interface ElectionInformationProps {
-  election: Election;
+  electionId: string;
   onViewResults?: () => void;
 }
 
 const ElectionInformation: React.FC<ElectionInformationProps> = ({
-  election,
+  electionId,
   onViewResults,
 }) => {
+  const { getElectionById } = useElectionStore();
+  const election = getElectionById(electionId);
+
+  if (!election) {
+    return null;
+  }
   const canViewResults = election.status === "COMPLETED";
 
   const handleViewResults = () => {
@@ -50,7 +56,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
             </span>
           </div>
           <p className="text-lg font-semibold text-gray-900 dark:text-white pl-6">
-            {formatDate(election.startTime)}
+            {formatDate(election.startDate)}
           </p>
         </div>
 
@@ -63,7 +69,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
             </span>
           </div>
           <p className="text-lg font-semibold text-gray-900 dark:text-white pl-6">
-            {formatDate(election.endTime)}
+            {formatDate(election.endDate)}
           </p>
         </div>
 
