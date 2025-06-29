@@ -10,5 +10,5 @@ interface NavItem {
 export const navListItems: NavItem[] = [
   { label: "Elections", href: "/elections", icon: Vote },
   { label: "Create Election", href: "/create-election", icon: Plus },
-  { label: "Polling Officer", href: "/polling-officer", icon: Users },
+  { label: "Polling Officer", href: "/elections/polling-officer", icon: Users },
 ];

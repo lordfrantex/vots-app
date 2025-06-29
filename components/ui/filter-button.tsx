@@ -1,7 +1,14 @@
-import React, { useState } from "react";
+import React from "react";
 
-const FilterButtons = () => {
-  const [activeFilter, setActiveFilter] = useState(0);
+interface FilterButtonsProps {
+  activeFilter: number;
+  onFilterChange: (filterIndex: number) => void;
+}
+
+const FilterButtons: React.FC<FilterButtonsProps> = ({
+  activeFilter,
+  onFilterChange,
+}) => {
   const filters = ["All", "Active", "Upcoming", "Completed"];
 
   const translateValues = [
@@ -45,7 +52,7 @@ const FilterButtons = () => {
                   ? "text-gray-800 dark:text-white"
                   : "text-gray-500 font-semibold hover:text-gray-700 dark:hover:text-gray-300"
               }`}
-            onClick={() => setActiveFilter(index)}
+            onClick={() => onFilterChange(index)}
           >
             {filter}
           </button>

@@ -7,7 +7,7 @@ import { BsFillShieldLockFill } from "react-icons/bs";
 
 const HeroImage = () => {
   return (
-    <div className="relative flex items-center justify-center mt-10">
+    <div className="relative flex items-center justify-center mt-10 mb-10">
       <div className="flex justify-center items-center gap-4">
         {/*Ballot Paper*/}
         <div className="size-16 lg:size-20 z-10  bg-white/10 rounded-full shadow-xl backdrop-blur-sm border border-white/30 items-center justify-center text-gray-800 font-semibold flex flex-col will-change-transform">

@@ -7,6 +7,8 @@ import App from "@/app/App";
 
 import "./globals.css";
 import { ToastProvider } from "@/components/providers/toast-provider";
+import { Suspense } from "react";
+import ProgressBar from "@/components/ui/progress-bar";
 
 const interVariable = Inter({
   variable: "--font-inter-sans",
@@ -32,6 +34,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <Suspense fallback={null}>
+            <ProgressBar />
+          </Suspense>
           <App>
             <Navbar />
             {children}

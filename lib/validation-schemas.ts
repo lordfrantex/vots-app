@@ -39,7 +39,7 @@ export const basicInfoSchema = z
       const start = new Date(data.startDate);
       const end = new Date(data.endDate);
       const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      return diffHours >= 1; // Minimum 1 hour election
+      return diffHours; // Minimum 1 hour election
     },
     {
       message: "Election must run for at least 1 hour",

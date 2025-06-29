@@ -122,7 +122,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
   return (
     <section
       id="election-page"
-      className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20"
+      className="justify-center items-center min-h-screen relative pt-[10rem] -mt-20  mb-[10rem]"
     >
       <div className="max-w-[1400px] mx-auto">
         <ElectionMain electionId={electionId} />

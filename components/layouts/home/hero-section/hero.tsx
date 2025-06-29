@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import HeroImage from "@/components/ui/hero-image";
 import { useRouter } from "next/navigation";
+import HowItWorksSection from "@/components/layouts/home/how-it-works-section/how-it-works";
+import WhoIsItForSection from "@/components/layouts/home/who-is-it-for-section/who-is-it-for";
+import WhyBlockchainSection from "@/components/layouts/home/why-blockchain-section/why-blockchain";
 
 export default function HeroSection() {
   const [, setHasAnimated] = useState(false);
@@ -34,20 +37,15 @@ export default function HeroSection() {
   }, []);
 
   return (
-    <section
-      id="home"
-      className="justify-center items-center min-h-screen relative pt-[11rem] lg:pt-[15rem] -mt-20"
-    >
+    <section className="justify-center items-center  relative pt-[11rem] lg:pt-[15rem] -mt-20 pb-10">
       <div
         className={cn(
           "absolute inset-0",
           "[background-size:40px_40px]",
           "[background-image:linear-gradient(to_right,#e4e4e7_1px,transparent_1px),linear-gradient(to_bottom,#e4e4e7_1px,transparent_1px)]",
-          "dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)] mask-radial-at-center mask-radial-from-100% opacity-60 mask-b-from-50%",
+          "dark:[background-image:linear-gradient(to_right,#262626_1px,transparent_1px),linear-gradient(to_bottom,#262626_1px,transparent_1px)] mask-radial-at-center mask-radial-from-100% opacity-40 mask-b-from-50%",
         )}
       />
-      {/* Radial gradient for the container to give a faded look */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)] dark:bg-black"></div>
 
       {/* Optimized background elements with will-change for GPU acceleration */}
       <div

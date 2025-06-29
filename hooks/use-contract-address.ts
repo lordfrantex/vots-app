@@ -10,11 +10,20 @@ import type { Voter } from "@/types/voter";
 import type { Category } from "@/types/category";
 import type { PollingOfficer } from "@/types/polling-officer";
 import type { PollingUnit } from "@/types/polling-unit";
+import {
+  convertCandidateFromContractEnhanced,
+  convertVoterForPollingOfficerEnhanced,
+  OffChainDataService,
+  type ContractCandidateInfoDTO,
+  type ContractElectionVoterResponse,
+  type PollingOfficerVoterView,
+} from "@/utils/contract-helpers";
 
-// Contract return type definitions
+// Contract return type definitions - UPDATED for new ABI
 interface ContractElectionSummary {
   electionId: bigint;
   electionName: string;
+  electionDescription: string; // NEW: Added description field
   state: number;
   startTimestamp: bigint;
   endTimestamp: bigint;
@@ -25,6 +34,7 @@ interface ContractElectionInfo {
   electionId: bigint;
   createdBy: `0x${string}`;
   electionName: string;
+  electionDescription: string; // NEW: Added description field
   state: number;
   startTimestamp: bigint;
   endTimestamp: bigint;
@@ -32,87 +42,53 @@ interface ContractElectionInfo {
   accreditedVotersCount: bigint;
   votedVotersCount: bigint;
   electionCategories: readonly string[];
-  candidatesList: readonly {
-    name: string;
-    matricNo: string;
-    category: string;
-    voteFor: bigint;
-    voteAgainst: bigint;
-  }[];
+  pollingOfficers: readonly `0x${string}`[]; // NEW: Direct addresses array
+  pollingUnits: readonly `0x${string}`[]; // NEW: Direct addresses array
+  candidatesList: readonly ContractCandidateInfoDTO[];
 }
 
-interface ContractElectionVoter {
-  name: string;
-  voterState: number;
-}
-
-// Election state enum mapping
+// Election state enum mapping - UPDATED for new states
 const ELECTION_STATE_MAP = {
-  0: "UPCOMING" as const,
-  1: "ACTIVE" as const,
-  2: "COMPLETED" as const,
+  0: "UPCOMING" as const, // OPENED
+  1: "ACTIVE" as const, // STARTED
+  2: "COMPLETED" as const, // ENDED
 } as const;
 
-// Helper functions - FIXED to preserve time information
+// Helper functions
 const timestampToDateTimeString = (timestamp: bigint): string => {
-  // Convert to milliseconds and create Date object
   const date = new Date(Number(timestamp) * 1000);
-
-  // Return ISO string which preserves full date and time
-  // Format: "2024-12-25T14:30:00.000Z"
   return date.toISOString();
 };
 
-// Alternative: If you prefer local date-time format
-const timestampToLocalDateTime = (timestamp: bigint): string => {
-  const date = new Date(Number(timestamp) * 1000);
+// Determine election status based on timestamps and state
+const determineElectionStatus = (
+  contractState: number,
+  startTimestamp: bigint,
+  endTimestamp: bigint,
+): "UPCOMING" | "ACTIVE" | "COMPLETED" => {
+  const now = Math.floor(Date.now() / 1000);
+  const start = Number(startTimestamp);
+  const end = Number(endTimestamp);
 
-  // Format as YYYY-MM-DDTHH:mm for datetime-local input compatibility
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
+  // If contract state is COMPLETED, respect that
+  if (contractState === 2) return "COMPLETED";
 
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-};
+  // Check timestamps for actual status
+  if (now < start) return "UPCOMING";
+  if (now >= start && now <= end) return "ACTIVE";
+  if (now > end) return "COMPLETED";
 
-// For backward compatibility, keep the date-only function
-const timestampToDateOnly = (timestamp: bigint): string => {
-  return new Date(Number(timestamp) * 1000).toISOString().split("T")[0];
-};
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
-const generateEmail = (name: string, matricNumber: string): string => {
-  const cleanName = name.toLowerCase().replace(/\s+/g, ".");
-  const cleanMatric = matricNumber.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `${cleanName}.${cleanMatric}@university.edu`;
-};
-
-const generateDepartment = (matricNumber: string): string => {
-  const parts = matricNumber.split("/");
-  if (parts.length >= 2) {
-    const deptCode = parts[0].toUpperCase();
-    const deptMap: Record<string, string> = {
-      CSC: "Computer Science",
-      ENG: "Engineering",
-      MED: "Medicine",
-      LAW: "Law",
-      BUS: "Business Administration",
-      EDU: "Education",
-      ART: "Arts",
-      SCI: "Sciences",
-      AGR: "Agriculture",
-      SOC: "Social Sciences",
-    };
-    return deptMap[deptCode] || `${deptCode} Department`;
-  }
-  return "General Studies";
+  // Fallback to contract state
+  return (
+    ELECTION_STATE_MAP[contractState as keyof typeof ELECTION_STATE_MAP] ||
+    "UPCOMING"
+  );
 };
 
 export const useContractElections = () => {
-  // Step 1: Get all elections summary
+  const contractAddress = useContractAddress();
+
+  // Get all elections summary - this works without wallet connection
   const {
     data: electionsData,
     isLoading: isLoadingSummary,
@@ -120,11 +96,15 @@ export const useContractElections = () => {
     refetch: refetchSummary,
   } = useReadContract({
     abi,
-    address: electionAddress,
+    address: contractAddress,
     functionName: "getAllElectionsSummary",
+    query: {
+      // This query doesn't require wallet connection
+      enabled: !!contractAddress,
+    },
   });
 
-  // Step 2: Get detailed info for each election
+  // Get detailed info for each election
   const electionIds = useMemo(() => {
     if (!electionsData) return [];
     return (electionsData as ContractElectionSummary[]).map(
@@ -132,64 +112,33 @@ export const useContractElections = () => {
     );
   }, [electionsData]);
 
-  // Prepare contracts for batch reading
+  // Prepare contracts for batch reading - UPDATED for new ABI structure
   const detailContracts = useMemo(() => {
     if (!electionIds.length) return [];
 
     return electionIds.flatMap((electionId) => [
-      // Get election info
       {
         abi,
-        address: electionAddress,
+        address: contractAddress,
         functionName: "getElectionInfo",
         args: [electionId],
       },
-      // Get all voters with their current states
       {
         abi,
-        address: electionAddress,
+        address: contractAddress,
         functionName: "getAllVoters",
         args: [electionId],
       },
-      // Get all accredited voters
       {
         abi,
-        address: electionAddress,
-        functionName: "getAllAccreditedVoters",
-        args: [electionId],
-      },
-      // Get all voted voters
-      {
-        abi,
-        address: electionAddress,
-        functionName: "getAllVotedVoters",
-        args: [electionId],
-      },
-      // Get election stats
-      {
-        abi,
-        address: electionAddress,
+        address: contractAddress,
         functionName: "getElectionStats",
         args: [electionId],
       },
-      // Get polling officer count
-      {
-        abi,
-        address: electionAddress,
-        functionName: "getPollingOfficerCount",
-        args: [electionId],
-      },
-      // Get polling unit count
-      {
-        abi,
-        address: electionAddress,
-        functionName: "getPollingUnitCount",
-        args: [electionId],
-      },
     ]);
-  }, [electionIds]);
+  }, [electionIds, contractAddress]);
 
-  // Batch read all detailed data
+  // Batch read all detailed data - this also works without wallet connection
   const {
     data: detailsData,
     isLoading: isLoadingDetails,
@@ -201,112 +150,86 @@ export const useContractElections = () => {
     },
   });
 
-  // Step 3: Transform and combine all data
+  // Transform and combine all data - UPDATED for new ABI structure
   const elections = useMemo(() => {
     if (!electionsData || !detailsData) return [];
 
     const summaries = electionsData as ContractElectionSummary[];
-    const details = detailsData as any[];
+    const details = detailsData as Array<{ result?: unknown; error?: Error }>;
 
     return summaries.map((summary, index) => {
-      const baseIndex = index * 7; // Each election has 7 contract calls
+      const baseIndex = index * 3; // Each election has 3 contract calls now
+      const electionId = summary.electionId.toString();
 
       // Extract data from batch results
       const electionInfoResult = details[baseIndex];
       const allVotersResult = details[baseIndex + 1];
-      const accreditedVotersResult = details[baseIndex + 2];
-      const votedVotersResult = details[baseIndex + 3];
-      const statsResult = details[baseIndex + 4];
-      const pollingOfficerCountResult = details[baseIndex + 5];
-      const pollingUnitCountResult = details[baseIndex + 6];
+      const electionStatsResult = details[baseIndex + 2];
 
-      // Get election info
       const electionInfo = electionInfoResult?.result as
         | ContractElectionInfo
         | undefined;
       const allVotersData = allVotersResult?.result as
-        | ContractElectionVoter[]
+        | ContractElectionVoterResponse[]
         | undefined;
-      const accreditedVotersData = accreditedVotersResult?.result as
-        | ContractElectionVoter[]
-        | undefined;
-      const votedVotersData = votedVotersResult?.result as
-        | ContractElectionVoter[]
-        | undefined;
-      const statsData = statsResult?.result as
+      const electionStats = electionStatsResult?.result as
         | [bigint, bigint, bigint, bigint, bigint, bigint]
         | undefined;
-      const pollingOfficerCount = pollingOfficerCountResult?.result as
-        | bigint
-        | undefined;
-      const pollingUnitCount = pollingUnitCountResult?.result as
-        | bigint
-        | undefined;
 
-      // Convert categories
+      // console.log(`Election ${electionId} data:`, {
+      //   votersCount: allVotersData?.length || 0,
+      //   electionInfo: electionInfo ? "loaded" : "missing",
+      //   stats: electionStats ? "loaded" : "missing",
+      // });
+
+      // Convert categories from blockchain data
       const categories: Category[] =
         electionInfo?.electionCategories.map((categoryName, idx) => ({
-          id: `${summary.electionId}-cat-${idx}`,
+          id: `${electionId}-cat-${idx}`,
           name: categoryName,
         })) || [];
 
-      // Convert candidates
+      // Convert candidates using enhanced function
       const candidates: Candidate[] =
-        electionInfo?.candidatesList.map((candidate, idx) => ({
-          id: `${candidate.matricNo}-${idx}`,
-          name: candidate.name,
-          matricNo: candidate.matricNo,
-          category: candidate.category,
-          voteCount: Number(candidate.voteFor),
-          photo: "/placeholder-user.jpg",
-        })) || [];
+        electionInfo?.candidatesList.map((candidate, idx) =>
+          convertCandidateFromContractEnhanced(candidate, idx, electionId),
+        ) || [];
 
-      // Create sets for quick lookup of voter states
-      const accreditedVoterNames = new Set(
-        accreditedVotersData?.map((v) => v.name) || [],
-      );
-      const votedVoterNames = new Set(
-        votedVotersData?.map((v) => v.name) || [],
-      );
-
-      // Convert voters with full details
-      const voters: Voter[] =
-        allVotersData?.map((voter, idx) => {
-          const matricNumber = `STU/${new Date().getFullYear()}/${String(idx + 1).padStart(4, "0")}`;
-          const isAccredited = accreditedVoterNames.has(voter.name);
-          const hasVoted = votedVoterNames.has(voter.name);
-
-          return {
-            id: generateId(),
-            name: voter.name,
-            matricNumber: matricNumber,
-            isAccredited,
-            hasVoted,
-            email: generateEmail(voter.name, matricNumber),
-            department: generateDepartment(matricNumber),
-          };
+      // Convert voters for POLLING OFFICERS (LIMITED INFO)
+      const pollingOfficerVoters: PollingOfficerVoterView[] =
+        allVotersData?.map((voterResponse, idx) => {
+          return convertVoterForPollingOfficerEnhanced(
+            voterResponse,
+            idx,
+            electionId,
+          );
         }) || [];
 
-      // Create polling officers and units based on count
-      const pollingOfficers: PollingOfficer[] = Array.from(
-        { length: Number(pollingOfficerCount || 0) },
-        (_, idx) => ({
-          id: `${summary.electionId}-po-${idx}`,
-          address:
-            `0x${Math.random().toString(16).substr(2, 40)}` as `0x${string}`,
-          role: `Polling Officer ${idx + 1}`,
-        }),
-      );
+      // Convert to standard Voter interface for compatibility
+      const voters: Voter[] = pollingOfficerVoters.map((pollingVoter) => ({
+        id: pollingVoter.id,
+        name: pollingVoter.name,
+        matricNumber: pollingVoter.maskedMatricNumber,
+        isAccredited: pollingVoter.isAccredited,
+        hasVoted: pollingVoter.hasVoted,
+      }));
 
-      const pollingUnits: PollingUnit[] = Array.from(
-        { length: Number(pollingUnitCount || 0) },
-        (_, idx) => ({
-          id: `${summary.electionId}-pu-${idx}`,
-          address:
-            `0x${Math.random().toString(16).substr(2, 40)}` as `0x${string}`,
-          name: `Polling Unit ${idx + 1}`,
-        }),
-      );
+      // Create polling officers and units from the new direct address arrays
+      const pollingOfficers: PollingOfficer[] = (
+        electionInfo?.pollingOfficers || []
+      ).map((address, idx) => ({
+        id: `${electionId}-po-${idx}`,
+        address: address,
+        role: `Polling Officer ${idx + 1}`,
+      }));
+
+      const pollingUnits: PollingUnit[] = (
+        electionInfo?.pollingUnits || []
+      ).map((address, idx) => ({
+        id: `${electionId}-pu-${idx}`,
+        address: address,
+        name: `Polling Unit ${idx + 1}`,
+      }));
 
       // Calculate total votes
       const totalVotes = candidates.reduce(
@@ -314,17 +237,24 @@ export const useContractElections = () => {
         0,
       );
 
-      // Build complete election object with FIXED date/time handling
+      // Get off-chain election metadata
+      const offChainData =
+        OffChainDataService.getElectionOffChainData(electionId);
+
+      // Determine accurate election status
+      const actualStatus = determineElectionStatus(
+        summary.state,
+        summary.startTimestamp,
+        summary.endTimestamp,
+      );
+
+      // Build complete election object - UPDATED with new description field
       const election: Election = {
-        id: summary.electionId.toString(),
+        id: electionId,
         name: summary.electionName,
-        // ✅ FIXED: Now preserves the actual time you specified
         startDate: timestampToDateTimeString(summary.startTimestamp),
         endDate: timestampToDateTimeString(summary.endTimestamp),
-        status:
-          ELECTION_STATE_MAP[
-            summary.state as keyof typeof ELECTION_STATE_MAP
-          ] || "UPCOMING",
+        status: actualStatus,
         categories,
         totalVoters: Number(summary.registeredVotersCount),
         totalVotes,
@@ -333,8 +263,13 @@ export const useContractElections = () => {
         pollingOfficers,
         pollingUnits,
         createdBy: electionInfo?.createdBy,
-        description: `Election for ${summary.electionName}`,
-        bannerImage: "/placeholder.jpg",
+        // Use blockchain description first, then fallback to off-chain
+        description:
+          summary.electionDescription ||
+          offChainData?.electionMetadata?.description ||
+          `Election for ${summary.electionName}`,
+        bannerImage:
+          offChainData?.electionMetadata?.bannerImage || "/placeholder.jpg",
         isPublished: true,
         timezone: "UTC",
         metadata: {},
@@ -355,8 +290,10 @@ export const useContractElections = () => {
   };
 };
 
-// Hook for getting a single election with full details
+// Hook for getting a single election with full details - UPDATED for new ABI
 export const useElectionDetails = (electionId: string | null) => {
+  const contractAddress = useContractAddress();
+
   const contracts = useMemo(() => {
     if (!electionId) return [];
 
@@ -364,53 +301,30 @@ export const useElectionDetails = (electionId: string | null) => {
     return [
       {
         abi,
-        address: electionAddress,
+        address: contractAddress,
         functionName: "getElectionInfo",
         args: [id],
       },
       {
         abi,
-        address: electionAddress,
+        address: contractAddress,
         functionName: "getAllVoters",
         args: [id],
       },
       {
         abi,
-        address: electionAddress,
-        functionName: "getAllAccreditedVoters",
-        args: [id],
-      },
-      {
-        abi,
-        address: electionAddress,
-        functionName: "getAllVotedVoters",
-        args: [id],
-      },
-      {
-        abi,
-        address: electionAddress,
+        address: contractAddress,
         functionName: "getElectionStats",
         args: [id],
       },
-      {
-        abi,
-        address: electionAddress,
-        functionName: "getPollingOfficerCount",
-        args: [id],
-      },
-      {
-        abi,
-        address: electionAddress,
-        functionName: "getPollingUnitCount",
-        args: [id],
-      },
     ];
-  }, [electionId]);
+  }, [electionId, contractAddress]);
 
   const {
     data: contractData,
     isLoading,
     error,
+    refetch,
   } = useReadContracts({
     contracts,
     query: {
@@ -421,38 +335,30 @@ export const useElectionDetails = (electionId: string | null) => {
   const election = useMemo(() => {
     if (!contractData || !electionId) return null;
 
-    const [
-      electionInfoResult,
-      allVotersResult,
-      accreditedVotersResult,
-      votedVotersResult,
-      statsResult,
-      pollingOfficerCountResult,
-      pollingUnitCountResult,
-    ] = contractData;
+    const [electionInfoResult, allVotersResult, electionStatsResult] =
+      contractData as Array<{
+        result?: unknown;
+        error?: Error;
+      }>;
 
     const electionInfo = electionInfoResult?.result as
       | ContractElectionInfo
       | undefined;
     const allVotersData = allVotersResult?.result as
-      | ContractElectionVoter[]
+      | ContractElectionVoterResponse[]
       | undefined;
-    const accreditedVotersData = accreditedVotersResult?.result as
-      | ContractElectionVoter[]
-      | undefined;
-    const votedVotersData = votedVotersResult?.result as
-      | ContractElectionVoter[]
-      | undefined;
-    const pollingOfficerCount = pollingOfficerCountResult?.result as
-      | bigint
-      | undefined;
-    const pollingUnitCount = pollingUnitCountResult?.result as
-      | bigint
+    const electionStats = electionStatsResult?.result as
+      | [bigint, bigint, bigint, bigint, bigint, bigint]
       | undefined;
 
     if (!electionInfo) return null;
+    //
+    // console.log(`Single election ${electionId} data:`, {
+    //   votersCount: allVotersData?.length || 0,
+    //   stats: electionStats ? "loaded" : "missing",
+    // });
 
-    // Convert all data similar to above
+    // Convert all data from blockchain
     const categories: Category[] = electionInfo.electionCategories.map(
       (categoryName, idx) => ({
         id: `${electionId}-cat-${idx}`,
@@ -461,54 +367,42 @@ export const useElectionDetails = (electionId: string | null) => {
     );
 
     const candidates: Candidate[] = electionInfo.candidatesList.map(
-      (candidate, idx) => ({
-        id: `${candidate.matricNo}-${idx}`,
-        name: candidate.name,
-        matricNo: candidate.matricNo,
-        category: candidate.category,
-        voteCount: Number(candidate.voteFor),
-        photo: "/placeholder-user.jpg",
-      }),
+      (candidate, idx) =>
+        convertCandidateFromContractEnhanced(candidate, idx, electionId),
     );
 
-    const accreditedVoterNames = new Set(
-      accreditedVotersData?.map((v) => v.name) || [],
-    );
-    const votedVoterNames = new Set(votedVotersData?.map((v) => v.name) || []);
-
-    const voters: Voter[] =
-      allVotersData?.map((voter, idx) => {
-        const matricNumber = `STU/${new Date().getFullYear()}/${String(idx + 1).padStart(4, "0")}`;
-        const isAccredited = accreditedVoterNames.has(voter.name);
-        const hasVoted = votedVoterNames.has(voter.name);
-
-        return {
-          id: generateId(),
-          name: voter.name,
-          matricNumber: matricNumber,
-          isAccredited,
-          hasVoted,
-          email: generateEmail(voter.name, matricNumber),
-          department: generateDepartment(matricNumber),
-        };
+    // Convert voters for POLLING OFFICERS (LIMITED INFO)
+    const pollingOfficerVoters: PollingOfficerVoterView[] =
+      allVotersData?.map((voterResponse, idx) => {
+        return convertVoterForPollingOfficerEnhanced(
+          voterResponse,
+          idx,
+          electionId,
+        );
       }) || [];
 
-    const pollingOfficers: PollingOfficer[] = Array.from(
-      { length: Number(pollingOfficerCount || 0) },
-      (_, idx) => ({
+    // Convert to standard Voter interface for compatibility
+    const voters: Voter[] = pollingOfficerVoters.map((pollingVoter) => ({
+      id: pollingVoter.id,
+      name: pollingVoter.name,
+      matricNumber: pollingVoter.maskedMatricNumber,
+      isAccredited: pollingVoter.isAccredited,
+      hasVoted: pollingVoter.hasVoted,
+    }));
+
+    // Create polling officers and units from direct address arrays
+    const pollingOfficers: PollingOfficer[] = electionInfo.pollingOfficers.map(
+      (address, idx) => ({
         id: `${electionId}-po-${idx}`,
-        address:
-          `0x${Math.random().toString(16).substr(2, 40)}` as `0x${string}`,
+        address: address,
         role: `Polling Officer ${idx + 1}`,
       }),
     );
 
-    const pollingUnits: PollingUnit[] = Array.from(
-      { length: Number(pollingUnitCount || 0) },
-      (_, idx) => ({
+    const pollingUnits: PollingUnit[] = electionInfo.pollingUnits.map(
+      (address, idx) => ({
         id: `${electionId}-pu-${idx}`,
-        address:
-          `0x${Math.random().toString(16).substr(2, 40)}` as `0x${string}`,
+        address: address,
         name: `Polling Unit ${idx + 1}`,
       }),
     );
@@ -518,16 +412,23 @@ export const useElectionDetails = (electionId: string | null) => {
       0,
     );
 
+    // Get off-chain election metadata
+    const offChainData =
+      OffChainDataService.getElectionOffChainData(electionId);
+
+    // Determine accurate election status
+    const actualStatus = determineElectionStatus(
+      electionInfo.state,
+      electionInfo.startTimestamp,
+      electionInfo.endTimestamp,
+    );
+
     const election: Election = {
       id: electionId,
       name: electionInfo.electionName,
-      // ✅ FIXED: Now preserves the actual time you specified
       startDate: timestampToDateTimeString(electionInfo.startTimestamp),
       endDate: timestampToDateTimeString(electionInfo.endTimestamp),
-      status:
-        ELECTION_STATE_MAP[
-          electionInfo.state as keyof typeof ELECTION_STATE_MAP
-        ] || "UPCOMING",
+      status: actualStatus,
       categories,
       totalVoters: Number(electionInfo.registeredVotersCount),
       totalVotes,
@@ -536,8 +437,13 @@ export const useElectionDetails = (electionId: string | null) => {
       pollingOfficers,
       pollingUnits,
       createdBy: electionInfo.createdBy,
-      description: `Election for ${electionInfo.electionName}`,
-      bannerImage: "/placeholder.jpg",
+      // Use blockchain description first, then fallback to off-chain
+      description:
+        electionInfo.electionDescription ||
+        offChainData?.electionMetadata?.description ||
+        `Election for ${electionInfo.electionName}`,
+      bannerImage:
+        offChainData?.electionMetadata?.bannerImage || "/placeholder.jpg",
       isPublished: true,
       timezone: "UTC",
       metadata: {},
@@ -550,5 +456,10 @@ export const useElectionDetails = (electionId: string | null) => {
     election,
     isLoading,
     error,
+    refetch,
   };
 };
+
+export function useContractAddress() {
+  return electionAddress as `0x${string}`;
+}

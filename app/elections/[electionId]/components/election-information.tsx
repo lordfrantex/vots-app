@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import ElectionResult from "@/app/elections/[electionId]/components/election-result";
 import { formatDate } from "@/lib/utils";
 import { useElectionStore } from "@/store/use-election";
+import { useRouter } from "next/navigation";
 
 interface ElectionInformationProps {
   electionId: string;
@@ -16,6 +17,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
   electionId,
   onViewResults,
 }) => {
+  const router = useRouter();
   const { getElectionById } = useElectionStore();
   const election = getElectionById(electionId);
 
@@ -23,6 +25,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
     return null;
   }
   const canViewResults = election.status === "COMPLETED";
+  const accessPolling = election.status === "ACTIVE";
 
   const handleViewResults = () => {
     if (canViewResults) {
@@ -106,6 +109,10 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
         <Button
           size="lg"
           className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
+          onClick={() =>
+            router.push(`/elections/${electionId}/polling-officer`)
+          }
+          disabled={!accessPolling}
         >
           <Shield className="w-5 h-5" />
           <span className="font-medium">Access Polling Officer Panel</span>
@@ -115,6 +122,8 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
         <Button
           size="lg"
           className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
+          onClick={() => router.push(`/elections/${electionId}/polling-unit`)}
+          disabled={!accessPolling}
         >
           <MapPin className="w-5 h-5" />
           <span className="font-medium">Access Polling Unit</span>

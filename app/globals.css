@@ -123,11 +123,15 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-inter;
+    @apply bg-background text-foreground font-inter min-h-full;
   }
 
   .dark body {
     background-image: linear-gradient(to right, #10091a 0%, #131923 60%, #06101e 100%);
+  }
+
+  .dark-mode-bg {
+    @apply bg-gradient-to-r from-[#10091a] via-[#131923] to-[#06101e]
   }
 
   /* Hide scrollbar but allow scroll */
@@ -152,6 +156,83 @@
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
+  /* Make the progress bar red */
+  #nprogress .bar {
+    background: rgb(34, 61, 138); /* Change color */
+    height: 4px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1031;
+  }
+
+  /* Remove spinner */
+  #nprogress .spinner {
+    display: none;
+  }
 
 
+
+
+
+}
+@layer components {
+  .glass-panel {
+    @apply bg-white/10 backdrop-blur-md border border-white/20;
+  }
+}
+
+@layer utilities {
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+  }
+
+  @keyframes marquee-reverse {
+    from {
+      transform: translateX(calc(-100% - var(--gap)));
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+
+  @keyframes marquee-vertical-reverse {
+    from {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .animate-marquee {
+    animation: marquee var(--duration) linear infinite;
+  }
+
+  .animate-marquee-reverse {
+    animation: marquee-reverse var(--duration) linear infinite;
+  }
+
+  .animate-marquee-vertical {
+    animation: marquee-vertical var(--duration) linear infinite;
+  }
+
+  .animate-marquee-vertical-reverse {
+    animation: marquee-vertical-reverse var(--duration) linear infinite;
+  }
 }

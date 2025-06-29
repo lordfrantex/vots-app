@@ -1,4 +1,5 @@
-// store/electionStore.ts
+// store/electionStore.ts (renamed to avoid conflict, but content is same as use-election.ts for this example)
+
 import { create } from "zustand";
 import { Election } from "@/types/election";
 
@@ -68,26 +69,27 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
   getFilteredElections: () => {
     const state = get();
     let filtered = state.elections;
+    const now = new Date(); // Get current time once for consistency
 
     // Filter by status
     if (state.filterStatus !== "all") {
       filtered = filtered.filter((election) => {
-        const now = new Date();
-
-        // Safely parse dates only if defined
-        const hasValidStart = !!election?.startDate;
-        const hasValidEnd = !!election?.endDate;
-
-        const startTime = hasValidStart ? new Date(election.startDate!) : null;
-        const endTime = hasValidEnd ? new Date(election.endDate!) : null;
+        // Ensure dates are valid before comparison
+        const startDate = election.startDate
+          ? new Date(election.startDate)
+          : null;
+        const endDate = election.endDate ? new Date(election.endDate) : null;
 
         switch (state.filterStatus) {
           case "active":
-            return startTime && endTime && now >= startTime && now <= endTime;
+            // An election is active if now is on or after start and on or before end
+            return startDate && endDate && now >= startDate && now <= endDate;
           case "upcoming":
-            return startTime && now < startTime;
+            // An election is upcoming if start date exists and now is before start
+            return startDate && now < startDate;
           case "ended":
-            return endTime && now > endTime;
+            // An election is ended if end date exists and now is after end
+            return endDate && now > endDate;
           default:
             return true;
         }
@@ -96,14 +98,11 @@ export const useElectionStore = create<ElectionState>((set, get) => ({
 
     // Filter by search query
     if (state.searchQuery) {
+      const lowerCaseQuery = state.searchQuery.toLowerCase();
       filtered = filtered.filter(
         (election) =>
-          election.name
-            .toLowerCase()
-            .includes(state.searchQuery.toLowerCase()) ||
-          election.description
-            ?.toLowerCase()
-            .includes(state.searchQuery.toLowerCase()),
+          election.name.toLowerCase().includes(lowerCaseQuery) ||
+          election.description?.toLowerCase().includes(lowerCaseQuery),
       );
     }
 
