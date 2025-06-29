@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Github } from "lucide-react";
 import Logo from "@/components/ui/logo";
 
@@ -27,28 +28,28 @@ const Footer = () => {
             <h3 className="font-semibold text-foreground mb-4">Pages</h3>
             <ul className="space-y-3">
               <li>
-                <a
+                <Link
                   href="/"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/election"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Election
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/create-election"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Create Election
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -58,20 +59,20 @@ const Footer = () => {
             <h3 className="font-semibold text-foreground mb-4">Legal</h3>
             <ul className="space-y-3">
               <li>
-                <a
+                <Link
                   href="/privacy-policy"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/terms-of-service"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   Terms of Service
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
