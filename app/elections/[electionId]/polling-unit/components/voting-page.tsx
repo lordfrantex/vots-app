@@ -24,6 +24,7 @@ import { useVoteCandidates } from "@/hooks/use-election-write-operations";
 import VoteConfirmationModal from "./vote-confirmation-modal";
 import type { Candidate } from "@/types/candidate";
 import Image from "next/image";
+import toast from "react-hot-toast";
 
 interface VotingPageProps {
   electionId: string;
@@ -48,16 +49,12 @@ interface VoteSelection {
   };
 }
 
-const VotingPage = ({
-  electionId,
-  voter,
-  pollingUnit,
-  onBack,
-}: VotingPageProps) => {
+const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const [selections, setSelections] = useState<VoteSelection>({});
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState("");
   const [votingEnded, setVotingEnded] = useState(false);
+  const [voteSubmitted, setVoteSubmitted] = useState(false);
 
   // Use the consolidated hook for election details
   const { election, isLoading, error } = useElectionDetails(electionId);
@@ -182,13 +179,34 @@ const VotingPage = ({
       });
 
       if (result.success) {
-        // Show success message and redirect after delay
+        setVoteSubmitted(true);
+        setShowConfirmation(false);
+
+        // Show success toast
+        toast.success("Your vote has been submitted successfully!", {
+          duration: 4000,
+          position: "top-center",
+          style: {
+            background: "#10B981",
+            color: "#FFFFFF",
+          },
+        });
+
+        // Wait for 3 seconds before going back to allow user to see the success state
         setTimeout(() => {
           onBack();
-        }, 3000);
+        }, 7000);
       }
     } catch (error) {
       console.error("Voting error:", error);
+      toast.error("Failed to submit vote. Please try again.", {
+        duration: 4000,
+        position: "top-center",
+        style: {
+          background: "#EF4444",
+          color: "#FFFFFF",
+        },
+      });
     }
   };
 
@@ -226,6 +244,36 @@ const VotingPage = ({
 
   // Check if voting has ended based on election status
   const isVotingEnded = election.status === "COMPLETED" || votingEnded;
+
+  // Vote submitted success state
+  if (voteSubmitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-center space-y-6">
+          <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
+            <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Vote Submitted Successfully!
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300">
+              Thank you for participating in the election.
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Redirecting you back to the authentication page...
+            </p>
+          </div>
+          <div className="flex items-center justify-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+            <span className="text-sm text-slate-600 dark:text-slate-300">
+              Please wait
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-24">

@@ -1,1 +1,1 @@
-export const electionAddress = "0x888E43FA8DC102A80ebC81263E1053C2e7e95Bb6";
+export const electionAddress = "0xbC9aFaB1b833427195F9674b0f34B501b408f810";

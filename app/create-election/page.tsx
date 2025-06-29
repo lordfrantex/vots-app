@@ -40,7 +40,6 @@ import type { ValidationData } from "@/types/validation-data";
 import type { Election } from "@/types/election";
 
 // UI Components
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
@@ -548,52 +547,6 @@ export default function CreateElectionPage() {
               txHash={txHash}
               isConfirmed={isConfirmed}
             />
-          </div>
-
-          {/* Bottom Actions */}
-          <div className="flex justify-between items-center pt-8 border-t">
-            <Button
-              variant="outline"
-              onClick={() => router.push("/elections")}
-              disabled={isSubmitting || isCreating || isConfirming}
-            >
-              Cancel
-            </Button>
-
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-muted-foreground">
-                {sections.filter((s) => s.isValid).length} of{" "}
-                {sections.length - 1} sections completed
-              </div>
-
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  !allFormsValid ||
-                  isSubmitting ||
-                  isCreating ||
-                  isConfirming ||
-                  isConfirmed
-                }
-                className="min-w-[150px]"
-              >
-                {isSubmitting || isCreating || isConfirming ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isCreating && !txHash && "Preparing..."}
-                    {isCreating && txHash && !isConfirmed && "Confirming..."}
-                    {isSubmitting && "Submitting..."}
-                  </>
-                ) : isConfirmed ? (
-                  <>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Created!
-                  </>
-                ) : (
-                  "Create Election"
-                )}
-              </Button>
-            </div>
           </div>
         </div>
       </div>

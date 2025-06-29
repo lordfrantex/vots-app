@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Users, Vote } from "lucide-react";
+import { Plus, Vote } from "lucide-react";
 
 interface NavItem {
   label: string;
@@ -10,5 +10,4 @@ interface NavItem {
 export const navListItems: NavItem[] = [
   { label: "Elections", href: "/elections", icon: Vote },
   { label: "Create Election", href: "/create-election", icon: Plus },
-  { label: "Polling Officer", href: "/elections/polling-officer", icon: Users },
 ];

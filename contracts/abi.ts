@@ -2,9 +2,20 @@ export const abi = [
   {
     inputs: [
       { internalType: "address", name: "_electionCreator", type: "address" },
+      { internalType: "address", name: "_nftAddress", type: "address" },
     ],
     stateMutability: "nonpayable",
     type: "constructor",
+  },
+  {
+    inputs: [{ internalType: "address", name: "owner", type: "address" }],
+    name: "OwnableInvalidOwner",
+    type: "error",
+  },
+  {
+    inputs: [{ internalType: "address", name: "account", type: "address" }],
+    name: "OwnableUnauthorizedAccount",
+    type: "error",
   },
   { inputs: [], name: "VotsEngine__DuplicateElectionName", type: "error" },
   { inputs: [], name: "VotsEngine__ElectionNameCannotBeEmpty", type: "error" },
@@ -49,6 +60,25 @@ export const abi = [
       },
     ],
     name: "FunctionClientUpdated",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "address",
+        name: "previousOwner",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "newOwner",
+        type: "address",
+      },
+    ],
+    name: "OwnershipTransferred",
     type: "event",
   },
   {
@@ -502,6 +532,13 @@ export const abi = [
   },
   {
     inputs: [],
+    name: "getNFTAddres",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
     name: "getOwner",
     outputs: [{ internalType: "address", name: "", type: "address" }],
     stateMutability: "view",
@@ -512,6 +549,20 @@ export const abi = [
     name: "getTotalElectionsCount",
     outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "owner",
+    outputs: [{ internalType: "address", name: "", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "renounceOwnership",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {
@@ -535,6 +586,13 @@ export const abi = [
       { internalType: "address", name: "_functionClient", type: "address" },
     ],
     name: "setFunctionClient",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "newOwner", type: "address" }],
+    name: "transferOwnership",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

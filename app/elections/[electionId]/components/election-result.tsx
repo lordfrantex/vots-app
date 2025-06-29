@@ -16,6 +16,7 @@ import { cn, formatDate } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ElectionChart from "@/components/ui/election-chart";
 import { FaUser } from "react-icons/fa6";
+import { Category } from "@/types/category";
 
 interface ElectionResultProps {
   election: Election;
@@ -29,17 +30,20 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
   canViewResults = false,
 }) => {
   const [open, setOpen] = React.useState(false);
-  const [activeCategory, setActiveCategory] = useState(election.categories[0]);
+  const [activeCategory, setActiveCategory] = useState<Category>(
+    election.categories[0],
+  );
 
   // Memoize the results calculation to avoid recalculation
   const resultsByCategory = useMemo(() => {
     // Group candidates by category and sort by votes
     const results = (election?.candidates ?? []).reduce(
       (acc, candidate) => {
-        if (!acc[candidate.category]) {
-          acc[candidate.category] = [];
+        const category = candidate.category as string;
+        if (!acc[category]) {
+          acc[category] = [];
         }
-        acc[candidate.category].push(candidate);
+        acc[category].push(candidate);
         return acc;
       },
       {} as Record<string, Candidate[]>,
@@ -65,7 +69,7 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
   // Handle category change - this will control both results and chart
   const handleCategoryChange = (category: string) => {
-    setActiveCategory(category);
+    setActiveCategory(category as unknown as Category);
   };
 
   // Render candidate card
@@ -221,47 +225,53 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
           {/* Single Tabs for Both Results and Chart */}
           <Tabs
-            defaultValue={election.categories[0]}
-            value={activeCategory}
+            defaultValue={election.categories[0] as unknown as string}
+            value={activeCategory as unknown as string}
             onValueChange={handleCategoryChange}
           >
             <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50">
               {election.categories.map((category) => (
                 <TabsTrigger
-                  key={category}
-                  value={category}
+                  key={category as unknown as string}
+                  value={category as unknown as string}
                   className={cn(
                     "bg-gray-50 dark:bg-[#0F172C] text-gray-400 dark:text-[#697AA1] font-medium cursor-pointer",
                     activeCategory === category &&
                       "font-bold text-white data-[state=active]:bg-indigo-600 data-[state=active]:bg-gradient-to-tr from-[#254192] to-[#192E69]",
                   )}
                 >
-                  {category}
+                  {category as unknown as string}
                 </TabsTrigger>
               ))}
             </TabsList>
 
             {election.categories.map((category) => (
               <TabsContent
-                key={category}
-                value={category}
+                key={category as unknown as string}
+                value={category as unknown as string}
                 className="space-y-6"
               >
                 {/* Candidate Results */}
                 <Card className="bg-gray-50 dark:bg-gray-900 p-4 py-10 rounded-lg shadow-xl dark:shadow-2xl">
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      {category} - Candidates
+                      {category as unknown as string} - Candidates
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {resultsByCategory[category]?.map((candidate, index) =>
-                        renderCandidateCard(candidate, index, category),
+                      {resultsByCategory[category as unknown as string]?.map(
+                        (candidate, index) =>
+                          renderCandidateCard(
+                            candidate,
+                            index,
+                            category as unknown as string,
+                          ),
                       ) || (
                         <div className="text-center py-8">
                           <p className="text-gray-500 dark:text-gray-400">
-                            No candidates found for {category}
+                            No candidates found for{" "}
+                            {category as unknown as string}
                           </p>
                         </div>
                       )}
@@ -272,7 +282,7 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
                 {/* Vote Analysis Chart - No tabs, just the chart */}
                 <ElectionChart
                   election={election}
-                  selectedCategory={activeCategory}
+                  selectedCategory={activeCategory as unknown as string}
                   resultsByCategory={resultsByCategory}
                   showCategoryTabs={false} // Hide category tabs in chart
                   showChartTypeToggle={true} // Keep chart type toggle

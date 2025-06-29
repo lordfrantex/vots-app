@@ -176,11 +176,11 @@ export const useContractElections = () => {
         | [bigint, bigint, bigint, bigint, bigint, bigint]
         | undefined;
 
-      // console.log(`Election ${electionId} data:`, {
-      //   votersCount: allVotersData?.length || 0,
-      //   electionInfo: electionInfo ? "loaded" : "missing",
-      //   stats: electionStats ? "loaded" : "missing",
-      // });
+      console.log(`Election ${electionId} data:`, {
+        votersCount: allVotersData?.length || 0,
+        electionInfo: electionInfo ? "loaded" : "missing",
+        stats: electionStats ? "loaded" : "missing",
+      });
 
       // Convert categories from blockchain data
       const categories: Category[] =
@@ -352,11 +352,11 @@ export const useElectionDetails = (electionId: string | null) => {
       | undefined;
 
     if (!electionInfo) return null;
-    //
-    // console.log(`Single election ${electionId} data:`, {
-    //   votersCount: allVotersData?.length || 0,
-    //   stats: electionStats ? "loaded" : "missing",
-    // });
+
+    console.log(`Single election ${electionId} data:`, {
+      votersCount: allVotersData?.length || 0,
+      stats: electionStats ? "loaded" : "missing",
+    });
 
     // Convert all data from blockchain
     const categories: Category[] = electionInfo.electionCategories.map(

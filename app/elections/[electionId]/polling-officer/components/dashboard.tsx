@@ -170,9 +170,7 @@ export function Dashboard({
         {/* Top Navigation Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-white">
-              Polling Officer Dashboard
-            </h1>
+            <h1 className="text-2xl font-bold">Polling Officer Dashboard</h1>
             <div className="text-sm text-slate-400">
               Connected: {officerWallet.slice(0, 6)}...{officerWallet.slice(-4)}
             </div>
@@ -197,23 +195,13 @@ export function Dashboard({
           votedCount={votedCount}
         />
 
-        {/* Security Notice */}
-        <Alert className="bg-slate-800/50 border-slate-700">
-          <Shield className="h-4 w-4" />
-          <AlertDescription className="text-slate-300">
-            <strong>Trustless System:</strong> You can only see masked
-            matriculation numbers for security. Full credentials are protected
-            and only used for blockchain verification.
-          </AlertDescription>
-        </Alert>
-
         {/* Officer Information Alert */}
-        <Alert className="bg-blue-900/20 border-blue-700">
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700 max-w-6xl mx-auto">
           <Shield className="h-4 w-4" />
-          <AlertDescription className="text-blue-300">
+          <AlertDescription className="text-blue-900 dark:text-blue-300">
             <strong>Polling Officer:</strong> {officerWallet}
             <br />
-            <span className="text-sm text-blue-400">
+            <span className="text-sm text-blue-900 dark:text-blue-300">
               All accreditation transactions will be signed with this wallet
               address.
             </span>

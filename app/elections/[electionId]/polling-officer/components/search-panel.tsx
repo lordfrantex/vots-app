@@ -289,7 +289,7 @@ export function InputAccreditationPanel({
   return (
     <div className="space-y-6">
       {/* Main Accreditation Panel */}
-      <Card className="bg-white dark:bg-slate-900/50 dark:border-slate-700/50">
+      <Card className="bg-white dark:bg-slate-900/50 dark:border-slate-700/50 max-w-6xl mx-auto">
         <CardHeader>
           <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <UserCheck className="h-5 w-5" />
