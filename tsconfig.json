@@ -17,6 +17,13 @@
     "noUnusedParameters": false,
     "noImplicitReturns": false,
     "noImplicitAny": false,
+    "noImplicitThis": false,
+    "noStrictGenericChecks": true,
+    "suppressImplicitAnyIndexErrors": true,
+    "suppressExcessPropertyErrors": true,
+    "noImplicitOverride": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "exactOptionalPropertyTypes": false,
     "plugins": [
       {
         "name": "next"
