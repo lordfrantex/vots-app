@@ -1,10 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
+import {
+  Vote,
+  Users,
+  CheckCircle,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
+import { useAccount } from "wagmi";
+
+// Hooks
+import { useElectionValidation } from "@/hooks/use-election-validation";
+import { useCreateElection } from "@/hooks/use-election-write-operations";
 
 // Form Components
 import { BasicInfoForm } from "@/components/layouts/create-election/basic-info-form";
@@ -15,47 +26,56 @@ import { PollingSetupForm } from "@/components/layouts/create-election/polling-s
 import { ReviewSummary } from "@/components/layouts/create-election/review-summary";
 import { ProgressHeader } from "@/components/layouts/create-election/progress-header";
 
-// Validation Schemas
-import {
-  basicInfoSchema,
-  categoriesSchema,
-  createCandidatesSchema,
-  votersSchema,
-  pollingSetupSchema,
-  type BasicInfoFormData,
-  type CategoriesFormData,
-  type CandidatesFormData,
-  type VotersFormData,
-  type PollingSetupFormData,
-} from "@/lib/validation-schemas";
-
 // Contract Integration
-import { useCreateElection } from "@/hooks/use-election-write-operations";
 import {
   convertToContractElectionParams,
   validateContractElectionParams,
   OffChainDataService,
 } from "@/utils/contract-helpers";
-import type { ValidationData } from "@/types/validation-data";
 import type { Election } from "@/types/election";
 
 // UI Components
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 
-interface FormSection {
-  id: string;
-  title: string;
-  isExpanded: boolean;
-  isValid: boolean;
-  canAccess: boolean;
-}
+const steps = [
+  { id: "basic", title: "Basic Info", icon: Vote },
+  { id: "categories", title: "Categories", icon: Users },
+  { id: "candidates", title: "Candidates", icon: Users },
+  { id: "voters", title: "Voters", icon: Users },
+  { id: "polling", title: "Polling Setup", icon: CheckCircle },
+  { id: "review", title: "Review", icon: CheckCircle },
+];
+
+const sectionIds = [
+  "basic",
+  "categories",
+  "candidates",
+  "voters",
+  "polling",
+  "review",
+];
 
 export default function CreateElectionPage() {
   const router = useRouter();
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // Contract integration
+  // Wallet connection
+  const { address, isConnected, isConnecting } = useAccount();
+  const [walletCheckLoading, setWalletCheckLoading] = useState(true);
+
+  // Election validation hook
+  const {
+    forms,
+    validationState,
+    validCategories,
+    currentStep,
+    setCurrentStep,
+    validateCompleteElection,
+    canAccessSection,
+  } = useElectionValidation();
+
+  // Contract integration hook
   const {
     createElection,
     isLoading: isCreating,
@@ -65,253 +85,102 @@ export default function CreateElectionPage() {
     isConfirming,
   } = useCreateElection();
 
-  // Form states
-  const [sections, setSections] = useState<FormSection[]>([
-    {
-      id: "basic",
-      title: "Basic Information",
-      isExpanded: true,
-      isValid: false,
-      canAccess: true,
-    },
-    {
-      id: "categories",
-      title: "Position Categories",
-      isExpanded: false,
-      isValid: false,
-      canAccess: false,
-    },
-    {
-      id: "candidates",
-      title: "Candidates",
-      isExpanded: false,
-      isValid: false,
-      canAccess: false,
-    },
-    {
-      id: "voters",
-      title: "Voters",
-      isExpanded: false,
-      isValid: false,
-      canAccess: false,
-    },
-    {
-      id: "polling",
-      title: "Polling Setup",
-      isExpanded: false,
-      isValid: false,
-      canAccess: false,
-    },
-    {
-      id: "review",
-      title: "Review & Submit",
-      isExpanded: false,
-      isValid: false,
-      canAccess: false,
-    },
-  ]);
-
-  const [validCategories, setValidCategories] = useState<string[]>([]);
+  // Local state for UI
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(["basic"]),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  // Form instances
-  const basicInfoForm = useForm<BasicInfoFormData>({
-    resolver: zodResolver(basicInfoSchema),
-    mode: "onChange",
-    defaultValues: {
-      name: "",
-      description: "",
-      startDate: "",
-      endDate: "",
-      timezone: "",
-    },
-  });
-
-  const categoriesForm = useForm<CategoriesFormData>({
-    resolver: zodResolver(categoriesSchema),
-    mode: "onChange",
-    defaultValues: {
-      categories: [],
-    },
-  });
-
-  const candidatesForm = useForm<CandidatesFormData>({
-    resolver: zodResolver(createCandidatesSchema(validCategories)),
-    mode: "onChange",
-    defaultValues: {
-      candidates: [],
-    },
-  });
-
-  const votersForm = useForm<VotersFormData>({
-    resolver: zodResolver(votersSchema),
-    mode: "onChange",
-    defaultValues: {
-      voters: [],
-    },
-  });
-
-  const pollingForm = useForm<PollingSetupFormData>({
-    resolver: zodResolver(pollingSetupSchema),
-    mode: "onChange",
-    defaultValues: {
-      pollingOfficers: [],
-      pollingUnits: [],
-    },
-  });
-
-  // Watch form validity
-  const basicInfoValid = basicInfoForm.formState.isValid;
-  const categoriesValid = categoriesForm.formState.isValid;
-  const candidatesValid = candidatesForm.formState.isValid;
-  const votersValid = votersForm.formState.isValid;
-  const pollingValid = pollingForm.formState.isValid;
-
-  // Update valid categories when categories form changes
+  // Wallet connection check effect
   useEffect(() => {
-    const subscription = categoriesForm.watch((value) => {
-      const categories =
-        value.categories
-          ?.map((cat) => cat?.name)
-          .filter((name): name is string => Boolean(name)) || [];
-      setValidCategories(categories);
-    });
-    return () => subscription.unsubscribe();
-  }, [categoriesForm]);
+    const checkWallet = async () => {
+      setWalletCheckLoading(true);
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      setWalletCheckLoading(false);
+    };
+    checkWallet();
+  }, []);
 
-  // Update section validity and access
-  useEffect(() => {
-    setSections((prev) =>
-      prev.map((section) => {
-        switch (section.id) {
-          case "basic":
-            return { ...section, isValid: basicInfoValid };
-          case "categories":
-            return {
-              ...section,
-              isValid: categoriesValid,
-              canAccess: basicInfoValid,
-            };
-          case "candidates":
-            return {
-              ...section,
-              isValid: candidatesValid,
-              canAccess: basicInfoValid && categoriesValid,
-            };
-          case "voters":
-            return {
-              ...section,
-              isValid: votersValid,
-              canAccess: basicInfoValid && categoriesValid,
-            };
-          case "polling":
-            return {
-              ...section,
-              isValid: pollingValid,
-              canAccess:
-                basicInfoValid &&
-                categoriesValid &&
-                candidatesValid &&
-                votersValid,
-            };
-          case "review":
-            return {
-              ...section,
-              isValid:
-                basicInfoValid &&
-                categoriesValid &&
-                candidatesValid &&
-                votersValid &&
-                pollingValid,
-              canAccess:
-                basicInfoValid &&
-                categoriesValid &&
-                candidatesValid &&
-                votersValid &&
-                pollingValid,
-            };
-          default:
-            return section;
-        }
-      }),
-    );
-  }, [
-    basicInfoValid,
-    categoriesValid,
-    candidatesValid,
-    votersValid,
-    pollingValid,
-  ]);
-
-  // Handle section toggle
-  const toggleSection = (sectionId: string) => {
-    setSections((prev) =>
-      prev.map((section) => {
-        if (section.id === sectionId && section.canAccess) {
-          return { ...section, isExpanded: !section.isExpanded };
-        }
-        return section;
-      }),
-    );
-  };
-
-  // Handle transaction updates
-  useEffect(() => {
-    if (hash) {
-      setTxHash(hash);
-    }
-  }, [hash]);
-
+  // Handle success state
   useEffect(() => {
     if (isSuccess) {
       setIsConfirmed(true);
       toast.success("Election created successfully!");
-
-      // Redirect after a delay
       setTimeout(() => {
         router.push("/elections");
       }, 3000);
     }
   }, [isSuccess, router]);
 
+  // Handle contract errors
   useEffect(() => {
     if (contractError) {
       toast.error("Failed to create election");
     }
   }, [contractError]);
 
-  // Collect all form data
-  const collectFormData = (): ValidationData => {
-    return {
-      basicInfo: basicInfoForm.getValues(),
-      categories: categoriesForm.getValues(),
-      candidates: candidatesForm.getValues(),
-      voters: votersForm.getValues(),
-      polling: pollingForm.getValues(),
-    };
+  // Section toggle handler
+  const toggleSection = useCallback(
+    (sectionId: string) => {
+      const newExpanded = new Set(expandedSections);
+      if (newExpanded.has(sectionId)) {
+        newExpanded.delete(sectionId);
+      } else {
+        newExpanded.add(sectionId);
+      }
+      setExpandedSections(newExpanded);
+    },
+    [expandedSections],
+  );
+
+  // Step navigation handler
+  const handleStepClick = useCallback(
+    (stepIndex: number) => {
+      const sectionId = sectionIds[stepIndex];
+      setCurrentStep(stepIndex);
+      setExpandedSections((prev) => new Set([...prev, sectionId]));
+
+      const sectionRef = sectionRefs.current[sectionId];
+      if (sectionRef) {
+        sectionRef.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        });
+      }
+    },
+    [setCurrentStep],
+  );
+
+  // Ref setter helper
+  const setRef = (sectionId: string) => (el: HTMLDivElement | null) => {
+    sectionRefs.current[sectionId] = el;
   };
 
-  // Convert to election format for review
-  const getElectionData = (): Election => {
-    const formData = collectFormData();
+  // Get election data for review
+  const getElectionData = useCallback((): Election => {
+    const basicInfo = forms.basicInfo.getValues();
+    const categories = forms.categories.getValues();
+    const candidates = forms.candidates.getValues();
+    const voters = forms.voters.getValues();
+    const polling = forms.polling.getValues();
 
     return {
       id: "preview",
-      name: formData.basicInfo.name,
-      description: formData.basicInfo.description,
-      startDate: formData.basicInfo.startDate,
-      endDate: formData.basicInfo.endDate,
-      timezone: formData.basicInfo.timezone,
+      name: basicInfo.name,
+      description: basicInfo.description,
+      startDate: basicInfo.startDate,
+      endDate: basicInfo.endDate,
+      timezone: basicInfo.timezone,
       status: "UPCOMING",
       categories:
-        formData.categories?.categories?.map((cat) => ({
+        categories.categories?.map((cat) => ({
           id: cat.id,
           name: cat.name,
         })) || [],
       candidates:
-        formData.candidates?.candidates?.map((candidate) => ({
+        candidates.candidates?.map((candidate) => ({
           id: candidate.id,
           name: candidate.name,
           matricNo: candidate.matricNo,
@@ -320,7 +189,7 @@ export default function CreateElectionPage() {
           voteCount: 0,
         })) || [],
       voters:
-        formData.voters?.voters?.map((voter) => ({
+        voters.voters?.map((voter) => ({
           id: voter.id,
           name: voter.name,
           matricNumber: voter.matricNumber,
@@ -330,56 +199,68 @@ export default function CreateElectionPage() {
           hasVoted: false,
         })) || [],
       pollingOfficers:
-        formData.polling?.pollingOfficers?.map((officer) => ({
+        polling.pollingOfficers?.map((officer) => ({
           id: officer.id,
           address: officer.address as `0x${string}`,
           role: officer.role,
         })) || [],
       pollingUnits:
-        formData.polling?.pollingUnits?.map((unit) => ({
+        polling.pollingUnits?.map((unit) => ({
           id: unit.id,
           address: unit.address as `0x${string}`,
           name: unit.name,
         })) || [],
-      totalVoters: formData.voters?.voters?.length || 0,
+      totalVoters: voters.voters?.length || 0,
       totalVotes: 0,
     };
-  };
+  }, [forms]);
 
-  // Handle form submission
-  const handleSubmit = async () => {
+  // Form submission handler
+  const handleSubmit = useCallback(async () => {
+    // Check wallet connection first
+    if (!isConnected || !address) {
+      toast.error("Please connect your wallet to create an election.");
+      return;
+    }
+
     console.log("=== FORM SUBMISSION START ===");
 
     try {
       setIsSubmitting(true);
 
-      // Collect and validate all form data
-      const validationData = collectFormData();
-      console.log("Collected form data:", validationData);
+      // Validate complete election
+      const validation = validateCompleteElection();
+      if (!validation.success || !validation.data) {
+        console.error("Validation errors:", validation.errors);
+        toast.error("Please complete all required fields before submitting.");
+        return;
+      }
+
+      console.log("Collected form data:", validation.data);
 
       // Convert to contract parameters
-      const contractParams = convertToContractElectionParams(validationData);
+      const contractParams = convertToContractElectionParams(validation.data);
       console.log("Contract parameters:", contractParams);
 
       // Validate contract parameters
-      const validation = validateContractElectionParams(contractParams);
-      if (!validation.isValid) {
-        console.error("Contract validation failed:", validation.errors);
+      const contractValidation = validateContractElectionParams(contractParams);
+      if (!contractValidation.isValid) {
+        console.error("Contract validation failed:", contractValidation.errors);
         toast.error("Validation failed");
         return;
       }
 
-      // Generate a temporary election ID for off-chain data storage
+      // Generate temporary election ID for off-chain data storage
       const tempElectionId = `temp-${Date.now()}`;
 
       // Save off-chain data before blockchain transaction
       OffChainDataService.saveElectionCreationData(
         tempElectionId,
-        validationData,
+        validation.data,
       );
       console.log("Saved off-chain data for election:", tempElectionId);
 
-      // Submit to blockchain
+      // Submit to blockchain using the hook
       const result = await createElection({
         electionParams: contractParams,
       });
@@ -396,157 +277,187 @@ export default function CreateElectionPage() {
       setIsSubmitting(false);
       console.log("=== FORM SUBMISSION END ===");
     }
-  };
+  }, [validateCompleteElection, createElection, isConnected, address]);
 
-  const allFormsValid = sections.every((section) =>
-    section.id === "review" ? true : section.isValid,
-  );
-  const reviewSection = sections.find((s) => s.id === "review");
+  const isLoading = isSubmitting || isCreating || isConfirming;
+
+  // Wallet connection status component
+  const WalletConnectionStatus = () => {
+    if (walletCheckLoading || isConnecting) {
+      return (
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            <p className="text-blue-800 dark:text-blue-200">
+              Checking wallet connection...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!isConnected) {
+      return (
+        <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            <p className="text-yellow-800 dark:text-yellow-200">
+              Please connect your wallet to create an election.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+        <div className="flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div>
+            <p className="text-green-800 dark:text-green-200 font-medium">
+              Wallet Connected
+            </p>
+            <p className="text-green-600 dark:text-green-300 text-sm">
+              {address?.slice(0, 6)}...{address?.slice(-4)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <section
       id="create-page"
-      className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20"
+      className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20 overflow-x-hidden"
     >
       <div className="mx-auto">
-        {/* Progress Header */}
-        <ProgressHeader sections={sections} />
+        <div className="min-h-screen">
+          {/* Progress Header */}
+          <ProgressHeader
+            steps={steps}
+            currentStep={currentStep}
+            validationState={validationState}
+            onStepClick={handleStepClick}
+          />
 
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          {/* Contract Error Alert */}
-          {contractError && (
-            <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Contract Error:</strong> {contractError}
-              </AlertDescription>
-            </Alert>
-          )}
+          <div className="max-w-7xl mx-auto px-6 pt-[15rem]">
+            {/* Wallet Connection Status */}
+            <WalletConnectionStatus />
 
-          {/* Success Alert */}
-          {isConfirmed && (
-            <Alert className="border-green-200 bg-green-50 text-green-800">
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Success!</strong> Your election has been created
-                successfully. Redirecting to elections page...
-              </AlertDescription>
-            </Alert>
-          )}
+            {/* Contract Error Alert */}
+            {contractError && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Contract Error:</strong> {contractError}
+                </AlertDescription>
+              </Alert>
+            )}
 
-          {/* Transaction Status */}
-          {(isCreating || isConfirming) && (
-            <Card className="border-blue-200 bg-blue-50">
-              <CardContent className="pt-6">
-                <div className="flex items-center space-x-3">
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                  <div>
-                    <p className="font-medium text-blue-900">
-                      {isCreating && !txHash && "Preparing transaction..."}
-                      {isCreating &&
-                        txHash &&
-                        !isConfirmed &&
-                        "Confirming transaction..."}
-                    </p>
-                    {txHash && (
-                      <p className="text-sm text-blue-700 font-mono break-all">
-                        Transaction: {txHash}
+            {/* Success Alert */}
+            {isConfirmed && (
+              <Alert className="border-green-200 bg-green-50 text-green-800 mb-6">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Success!</strong> Your election has been created
+                  successfully. Redirecting to elections page...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Transaction Status */}
+            {(isCreating || isConfirming) && (
+              <Card className="border-blue-200 bg-blue-50 mb-6">
+                <CardContent className="pt-6">
+                  <div className="flex items-center space-x-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                    <div>
+                      <p className="font-medium text-blue-900">
+                        {isCreating && !hash && "Preparing transaction..."}
+                        {isCreating &&
+                          hash &&
+                          !isConfirmed &&
+                          "Confirming transaction..."}
                       </p>
-                    )}
+                      {hash && (
+                        <p className="text-sm text-blue-700 font-mono break-all">
+                          Transaction: {hash}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
 
-          {/* Form Sections */}
-          <div className="space-y-6">
-            {/* Basic Information */}
-            <BasicInfoForm
-              form={basicInfoForm}
-              isExpanded={
-                sections.find((s) => s.id === "basic")?.isExpanded || false
-              }
-              onToggle={() => toggleSection("basic")}
-              canAccess={
-                sections.find((s) => s.id === "basic")?.canAccess || false
-              }
-              isValid={sections.find((s) => s.id === "basic")?.isValid || false}
-            />
+            {/* Form Sections */}
+            <div className="space-y-6">
+              <div ref={setRef("basic")}>
+                <BasicInfoForm
+                  form={forms.basicInfo}
+                  isExpanded={expandedSections.has("basic")}
+                  onToggle={() => toggleSection("basic")}
+                  canAccess={canAccessSection("basicInfo")}
+                  isValid={validationState.basicInfo}
+                />
+              </div>
 
-            {/* Categories */}
-            <CategoriesForm
-              form={categoriesForm}
-              isExpanded={
-                sections.find((s) => s.id === "categories")?.isExpanded || false
-              }
-              onToggle={() => toggleSection("categories")}
-              canAccess={
-                sections.find((s) => s.id === "categories")?.canAccess || false
-              }
-              isValid={
-                sections.find((s) => s.id === "categories")?.isValid || false
-              }
-            />
+              <div ref={setRef("categories")}>
+                <CategoriesForm
+                  form={forms.categories}
+                  isExpanded={expandedSections.has("categories")}
+                  onToggle={() => toggleSection("categories")}
+                  canAccess={canAccessSection("categories")}
+                  isValid={validationState.categories}
+                />
+              </div>
 
-            {/* Candidates */}
-            <CandidatesForm
-              form={candidatesForm}
-              validCategories={validCategories}
-              isExpanded={
-                sections.find((s) => s.id === "candidates")?.isExpanded || false
-              }
-              onToggle={() => toggleSection("candidates")}
-              canAccess={
-                sections.find((s) => s.id === "candidates")?.canAccess || false
-              }
-              isValid={
-                sections.find((s) => s.id === "candidates")?.isValid || false
-              }
-            />
+              <div ref={setRef("candidates")}>
+                <CandidatesForm
+                  form={forms.candidates}
+                  validCategories={validCategories}
+                  isExpanded={expandedSections.has("candidates")}
+                  onToggle={() => toggleSection("candidates")}
+                  canAccess={canAccessSection("candidates")}
+                  isValid={validationState.candidates}
+                />
+              </div>
 
-            {/* Voters */}
-            <VotersForm
-              form={votersForm}
-              isExpanded={
-                sections.find((s) => s.id === "voters")?.isExpanded || false
-              }
-              onToggle={() => toggleSection("voters")}
-              canAccess={
-                sections.find((s) => s.id === "voters")?.canAccess || false
-              }
-              isValid={
-                sections.find((s) => s.id === "voters")?.isValid || false
-              }
-            />
+              <div ref={setRef("voters")}>
+                <VotersForm
+                  form={forms.voters}
+                  isExpanded={expandedSections.has("voters")}
+                  onToggle={() => toggleSection("voters")}
+                  canAccess={canAccessSection("voters")}
+                  isValid={validationState.voters}
+                />
+              </div>
 
-            {/* Polling Setup */}
-            <PollingSetupForm
-              form={pollingForm}
-              isExpanded={
-                sections.find((s) => s.id === "polling")?.isExpanded || false
-              }
-              onToggle={() => toggleSection("polling")}
-              canAccess={
-                sections.find((s) => s.id === "polling")?.canAccess || false
-              }
-              isValid={
-                sections.find((s) => s.id === "polling")?.isValid || false
-              }
-            />
+              <div ref={setRef("polling")}>
+                <PollingSetupForm
+                  form={forms.polling}
+                  isExpanded={expandedSections.has("polling")}
+                  onToggle={() => toggleSection("polling")}
+                  canAccess={canAccessSection("polling")}
+                  isValid={validationState.polling}
+                />
+              </div>
 
-            {/* Review & Submit */}
-            <ReviewSummary
-              electionData={getElectionData()}
-              isExpanded={reviewSection?.isExpanded || false}
-              onToggle={() => toggleSection("review")}
-              onSubmit={handleSubmit}
-              canAccess={reviewSection?.canAccess || false}
-              isValid={allFormsValid}
-              isSubmitting={isSubmitting || isCreating || isConfirming}
-              txHash={txHash}
-              isConfirmed={isConfirmed}
-            />
+              <div ref={setRef("review")}>
+                <ReviewSummary
+                  electionData={getElectionData()}
+                  isExpanded={expandedSections.has("review")}
+                  onToggle={() => toggleSection("review")}
+                  onSubmit={handleSubmit}
+                  canAccess={canAccessSection("complete")}
+                  isValid={validationState.complete}
+                  isSubmitting={isLoading}
+                  txHash={hash}
+                  isConfirmed={isConfirmed}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
