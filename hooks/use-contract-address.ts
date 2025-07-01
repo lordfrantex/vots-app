@@ -1,9 +1,12 @@
 "use client";
 
-import { useReadContract, useReadContracts } from "wagmi";
+import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { useMemo } from "react";
 import { abi } from "@/contracts/abi";
-import { electionAddress } from "@/contracts/election-address";
+import {
+  electionAddress,
+  SUPPORTED_CHAINS,
+} from "@/contracts/election-address";
 import type { Election } from "@/types/election";
 import type { Candidate } from "@/types/candidate";
 import type { Voter } from "@/types/voter";
@@ -18,6 +21,7 @@ import {
   type ContractElectionVoterResponse,
   type PollingOfficerVoterView,
 } from "@/utils/contract-helpers";
+import { sepolia } from "wagmi/chains";
 
 // Contract return type definitions - UPDATED for new ABI
 interface ContractElectionSummary {
@@ -85,10 +89,12 @@ const determineElectionStatus = (
   );
 };
 
-export const useContractElections = () => {
-  const contractAddress = useContractAddress();
+export const useContractElections = (preferredChainId?) => {
+  const { chain } = useAccount();
+  const targetChainId = preferredChainId || chain?.id || sepolia.id;
+  const contractAddress = useContractAddress(targetChainId);
 
-  // Get all elections summary - this works without wallet connection
+  // Get all elections summary - FORCE SEPOLIA CHAIN
   const {
     data: electionsData,
     isLoading: isLoadingSummary,
@@ -98,9 +104,10 @@ export const useContractElections = () => {
     abi,
     address: contractAddress,
     functionName: "getAllElectionsSummary",
+    chainId: targetChainId,
     query: {
-      // This query doesn't require wallet connection
-      enabled: !!contractAddress,
+      enabled:
+        !!contractAddress && SUPPORTED_CHAINS.includes(targetChainId as any),
     },
   });
 
@@ -138,13 +145,17 @@ export const useContractElections = () => {
     ]);
   }, [electionIds, contractAddress]);
 
-  // Batch read all detailed data - this also works without wallet connection
+  // Batch read all detailed data - FORCE SEPOLIA CHAIN
+  // @ts-ignore
   const {
     data: detailsData,
     isLoading: isLoadingDetails,
     error: detailsError,
   } = useReadContracts({
-    contracts: detailContracts,
+    contracts: detailContracts.map((contract) => ({
+      ...contract,
+      chainId: targetChainId,
+    })),
     query: {
       enabled: detailContracts.length > 0,
     },
@@ -291,8 +302,13 @@ export const useContractElections = () => {
 };
 
 // Hook for getting a single election with full details - UPDATED for new ABI
-export const useElectionDetails = (electionId: string | null) => {
-  const contractAddress = useContractAddress();
+export const useElectionDetails = (
+  electionId: string | null,
+  preferredChainId?,
+) => {
+  const { chain } = useAccount();
+  const targetChainId = preferredChainId || chain?.id || sepolia.id;
+  const contractAddress = useContractAddress(targetChainId);
 
   const contracts = useMemo(() => {
     if (!electionId) return [];
@@ -304,18 +320,21 @@ export const useElectionDetails = (electionId: string | null) => {
         address: contractAddress,
         functionName: "getElectionInfo",
         args: [id],
+        chainId: targetChainId,
       },
       {
         abi,
         address: contractAddress,
         functionName: "getAllVoters",
         args: [id],
+        chainId: targetChainId,
       },
       {
         abi,
         address: contractAddress,
         functionName: "getElectionStats",
         args: [id],
+        chainId: targetChainId,
       },
     ];
   }, [electionId, contractAddress]);
@@ -460,6 +479,12 @@ export const useElectionDetails = (electionId: string | null) => {
   };
 };
 
-export function useContractAddress() {
-  return electionAddress as `0x${string}`;
+export function useContractAddress(chainId?: number) {
+  const { chain } = useAccount();
+  const targetChainId = chainId || chain?.id || sepolia.id; // Default to Sepolia
+
+  return (
+    electionAddress[targetChainId as keyof typeof electionAddress] ||
+    electionAddress[sepolia.id]
+  );
 }

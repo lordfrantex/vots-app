@@ -50,8 +50,8 @@ const ElectionCard: React.FC<ElectionCardProps> = ({ election }) => {
       relative rounded-lg border transition-all duration-200 group-hover:shadow-md
       ${
         darkMode
-          ? "bg-gray-900 border-gray-800 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/30"
-          : "bg-white/70 border-gray-200 shadow-2xl shadow-indigo-300/20 hover:shadow-gray-300/60"
+          ? "bg-gray-900 border-gray-800 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/10"
+          : "bg-white/70 border-gray-200 shadow-2xl shadow-indigo-300/20 hover:shadow-gray-300/20"
       }
     `}
     >

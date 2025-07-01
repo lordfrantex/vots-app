@@ -1,13 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { injected } from "wagmi/connectors";
 import {
   Dialog,
@@ -25,8 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { abi } from "@/contracts/abi";
-import { electionAddress } from "@/contracts/election-address";
+import { useValidatePollingOfficer } from "@/hooks/use-election-write-operations";
 
 interface WalletConnectionModalProps {
   isOpen: boolean;
@@ -46,9 +39,6 @@ export function WalletConnectionModal({
   const [validationResult, setValidationResult] = useState<boolean | null>(
     null,
   );
-  const [validationTxHash, setValidationTxHash] = useState<
-    `0x${string}` | undefined
-  >();
 
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
@@ -63,58 +53,37 @@ export function WalletConnectionModal({
     return BigInt(electionId);
   }, [electionId]);
 
-  // Write contract hook for validation
+  // Use the polling officer validation hook
   const {
-    writeContract: validateOfficer,
-    data: validationHash,
+    validatePollingOfficer,
+    isLoading: isContractLoading,
+    isSuccess: isValidationSuccess,
     error: contractError,
-    isPending: isContractPending,
-  } = useWriteContract();
-
-  // Wait for transaction receipt
-  const {
-    isLoading: isConfirming,
-    isSuccess: isConfirmed,
-    data: receipt,
-  } = useWaitForTransactionReceipt({
     hash: validationHash,
-  });
+    isPending: isContractPending,
+    isConfirming,
+  } = useValidatePollingOfficer();
 
-  // Update validation hash when transaction is submitted
+  // Handle validation success
   useEffect(() => {
-    if (validationHash) {
-      setValidationTxHash(validationHash);
-    }
-  }, [validationHash]);
-
-  // Handle transaction confirmation
-  useEffect(() => {
-    if (isConfirmed && receipt && address) {
-      // Parse the transaction receipt to determine if validation was successful
-      // Since this is a write function that returns a boolean, we need to check the transaction logs
-      // For now, we'll assume success if the transaction was confirmed without reverting
-      const isValid = receipt.status === "success";
-
-      setValidationResult(isValid);
+    if (isValidationSuccess && address) {
+      console.log("Polling officer validation successful");
+      setValidationResult(true);
       setIsValidating(false);
-
-      if (isValid) {
-        onConnect(address, true);
-      } else {
-        setError(
-          "Wallet validation failed - you are not authorized as a polling officer for this election",
-        );
-      }
+      onConnect(address, true);
     }
-  }, [isConfirmed, receipt, address, onConnect]);
+  }, [isValidationSuccess, address, onConnect]);
 
   // Handle contract errors
   useEffect(() => {
     if (contractError) {
+      console.error("Polling officer validation error:", contractError);
       setError(
-        contractError.message.includes("user rejected")
+        contractError.includes("user rejected")
           ? "Transaction was rejected by user"
-          : "Failed to validate wallet. Please ensure you're connected to the correct network and have sufficient gas.",
+          : contractError.includes("Not authorized")
+            ? "You are not authorized as a polling officer for this election"
+            : "Failed to validate polling officer. Please ensure you're connected to the correct network and have sufficient gas.",
       );
       setValidationResult(false);
       setIsValidating(false);
@@ -139,21 +108,23 @@ export function WalletConnectionModal({
     setIsValidating(true);
     setError("");
     setValidationResult(null);
-    setValidationTxHash(undefined);
 
     try {
-      // Call the write contract function
-      validateOfficer({
-        address: electionAddress as `0x${string}`,
-        abi,
-        functionName: "validateAddressAsPollingOfficer",
-        args: [electionTokenId],
-      });
+      console.log("Validating polling officer wallet:", address);
+      console.log("Election Token ID:", electionTokenId);
 
-      // Note: The actual validation result will be handled in the useEffect above
-      // when the transaction is confirmed
-    } catch {
-      setError("Failed to initiate wallet validation");
+      // Call the validation function
+      const result = await validatePollingOfficer(electionTokenId);
+
+      if (!result.success) {
+        setError(result.message);
+        setValidationResult(false);
+        setIsValidating(false);
+      }
+      // Success will be handled by the useEffect above
+    } catch (err) {
+      console.error("Validation error:", err);
+      setError("Failed to initiate polling officer validation");
       setValidationResult(false);
       setIsValidating(false);
     }
@@ -164,7 +135,8 @@ export function WalletConnectionModal({
       setError("");
       setValidationResult(null);
       connect({ connector: injected() });
-    } catch {
+    } catch (err) {
+      console.error("Connection error:", err);
       setError("Failed to connect to MetaMask");
     }
   };
@@ -172,11 +144,11 @@ export function WalletConnectionModal({
   const handleDisconnect = () => {
     disconnect();
     setValidationResult(null);
-    setValidationTxHash(undefined);
     setError("");
   };
 
-  const isProcessing = isValidating || isContractPending || isConfirming;
+  const isProcessing =
+    isValidating || isContractPending || isConfirming || isContractLoading;
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
@@ -255,7 +227,7 @@ export function WalletConnectionModal({
               </div>
 
               {/* Transaction Status */}
-              {validationTxHash && (
+              {validationHash && (
                 <div className="p-4 bg-blue-500/20 dark:bg-blue-900/20 border border-blue-700/50 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     {isConfirming ? (
@@ -270,7 +242,7 @@ export function WalletConnectionModal({
                     </span>
                   </div>
                   <p className="text-xs text-blue-600 dark:text-blue-400 font-mono break-all">
-                    {validationTxHash}
+                    {validationHash}
                   </p>
                 </div>
               )}
@@ -297,8 +269,8 @@ export function WalletConnectionModal({
                     }
                   >
                     {validationResult
-                      ? " Wallet verified as authorized polling officer"
-                      : "Wallet not authorized for this election"}
+                      ? "✅ Wallet verified as authorized polling officer"
+                      : "❌ Wallet not authorized as polling officer for this election"}
                   </AlertDescription>
                 </Alert>
               )}
@@ -314,7 +286,7 @@ export function WalletConnectionModal({
               )}
 
               {/* Validate Button */}
-              {validationResult === null && !validationTxHash && (
+              {validationResult === null && !validationHash && (
                 <Button
                   onClick={handleValidateConnectedWallet}
                   disabled={isProcessing}
@@ -360,7 +332,7 @@ export function WalletConnectionModal({
             contract. This requires a blockchain transaction to verify your
             polling officer status.
           </p>
-          {isConnected && validationResult === null && !validationTxHash && (
+          {isConnected && validationResult === null && !validationHash && (
             <p className="text-xs text-amber-700 dark:text-amber-400 text-center mt-2">
               ⚠️ A small gas fee will be required for validation
             </p>

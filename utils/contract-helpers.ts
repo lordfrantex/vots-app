@@ -188,21 +188,22 @@ export function convertCandidateToContract(
   candidate: ExtendedCandidateInfo,
 ): ContractCandidateInfoDTO {
   return {
-    name: safeString(candidate.name),
-    matricNo: safeString(candidate.matricNo),
-    category: safeString(candidate.category),
+    name: safeString(candidate.name || "Unknown Candidate"),
+    matricNo: safeString(candidate.matricNo || "Unknown Matric No"),
+    category: safeString(candidate.category || "Unknown Category"),
     voteFor: safeBigInt(candidate.voteFor || 0),
     voteAgainst: safeBigInt(candidate.voteAgainst || 0),
   } as const;
 }
 
 // Convert frontend voter data to contract format (only blockchain fields)
+
 export function convertVoterToContract(
   voter: ExtendedVoterInfo,
 ): ContractVoterInfoDTO {
   return {
-    name: safeString(voter.name),
-    matricNo: safeString(voter.matricNumber),
+    name: safeString(voter.name || "Unknown Voter"),
+    matricNo: safeString(voter.matricNumber || "Unknown Matric No"),
   } as const;
 }
 

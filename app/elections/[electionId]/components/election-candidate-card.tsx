@@ -13,7 +13,7 @@ const ElectionCandidateCard: React.FC<{
   return (
     <div
       className={` bg-gray-50 dark:bg-gray-900 p-6 rounded-lg shadow-xl
-            dark:shadow-2xl hover:shadow-2xl/50 relative transition-all duration-300 
+            dark:shadow-2xl hover:shadow-2xl hover:shadow-black/20 relative transition-all duration-300 
       ${isLeading && showActualVotes ? "ring-2 ring-indigo-600 bg-gradient-to-br from-purple-50 to-orange-50/10 dark:from-blue-600/20 dark:via-70% dark:to-gray-950" : ""}
     `}
     >

@@ -108,7 +108,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
         {/* Access Polling Officer Panel */}
         <Button
           size="lg"
-          className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
+          className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
           onClick={() =>
             router.push(`/elections/${electionId}/polling-officer`)
           }
@@ -121,7 +121,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
         {/* Access Polling Unit */}
         <Button
           size="lg"
-          className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
+          className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
           onClick={() => router.push(`/elections/${electionId}/polling-unit`)}
           disabled={!accessPolling}
         >

@@ -15,15 +15,12 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Search, Vote, Hash } from "lucide-react";
+import { Search, Vote, Hash, Calendar } from "lucide-react";
 import React, { useState } from "react";
-
-interface Election {
-  id: string;
-  name: string;
-  type?: string;
-  date?: string;
-}
+import { useRouter } from "next/navigation";
+import { useContractElections } from "@/hooks/use-contract-address";
+import { Election } from "@/types/election";
+import { getStatusBadge } from "@/components/utilities/status-badge";
 
 interface GlassSearchInputProps {
   placeholder?: string;
@@ -36,53 +33,43 @@ export default function GlassSearchInput({
   placeholder = "Find elections",
   onElectionSelect,
   className,
-  elections = [
-    {
-      id: "2024-001",
-      name: "Presidential Election 2024",
-      type: "Presidential",
-      date: "Nov 5, 2024",
-    },
-    {
-      id: "2024-002",
-      name: "Senate Elections",
-      type: "Senate",
-      date: "Nov 5, 2024",
-    },
-    {
-      id: "2024-003",
-      name: "House of Representatives",
-      type: "House",
-      date: "Nov 5, 2024",
-    },
-    {
-      id: "2023-001",
-      name: "Gubernatorial Election",
-      type: "State",
-      date: "Nov 7, 2023",
-    },
-    {
-      id: "2023-002",
-      name: "Local Municipal Elections",
-      type: "Local",
-      date: "May 15, 2023",
-    },
-  ],
 }: GlassSearchInputProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
+
+  const { elections, isLoading } = useContractElections();
 
   const filteredElections = elections.filter(
     (election) =>
       election.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       election.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      election.type?.toLowerCase().includes(searchQuery.toLowerCase()),
+      election.status?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const handleElectionSelect = (election: Election) => {
+    // Call the optional callback first
     onElectionSelect?.(election);
+
+    // Navigate to the election page
+    router.push(`/elections/${election.id}`);
+
+    // Close dialog and reset search
     setOpen(false);
     setSearchQuery("");
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   return (
@@ -104,14 +91,14 @@ export default function GlassSearchInput({
         <DialogTitle className="sr-only">Search Elections</DialogTitle>
         <Command className="rounded-lg border shadow-md">
           <CommandInput
-            placeholder="Search elections by name or ID..."
+            placeholder="Search elections by name, ID, or status..."
             value={searchQuery}
             onValueChange={setSearchQuery}
             className="border-none focus:ring-0"
           />
           <CommandList className="max-h-96">
             <CommandEmpty className="py-6 text-center text-sm">
-              No elections found.
+              {isLoading ? "Loading elections..." : "No elections found."}
             </CommandEmpty>
 
             {filteredElections.length > 0 && (
@@ -119,28 +106,49 @@ export default function GlassSearchInput({
                 {filteredElections.map((election) => (
                   <CommandItem
                     key={election.id}
-                    value={`${election.name} ${election.id}`}
+                    value={`${election.name} ${election.id} ${election.status}`}
                     onSelect={() => handleElectionSelect(election)}
-                    className="flex items-center gap-3 p-3 cursor-pointer"
+                    className="flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
                   >
-                    <Vote className="w-4 h-4 text-blue-500" />
-                    <div className="flex-1">
-                      <div className="font-medium">{election.name}</div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Hash className="w-3 h-3" />
-                        <span>{election.id}</span>
-                        {election.type && (
-                          <>
-                            <span>•</span>
-                            <span>{election.type}</span>
-                          </>
-                        )}
-                        {election.date && (
-                          <>
-                            <span>•</span>
-                            <span>{election.date}</span>
-                          </>
-                        )}
+                    <Vote className="w-5 h-5 text-blue-500 flex-shrink-0" />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm mb-1 truncate">
+                        {election.name}
+                      </div>
+
+                      <div className="flex space-x-3 items-center">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Hash className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{election.id}</span>
+                        </div>
+
+                        <div className="flex items-center space-x-6 flex-wrap">
+                          {/* Status Badge */}
+                          {election.status && (
+                            <span
+                              className={cn(
+                                getStatusBadge(election.status),
+                                "text-xs px-2 py-1 capitalize",
+                              )}
+                            >
+                              {election.status === "ACTIVE" && (
+                                <span className="size-1.5 bg-green-400 rounded-full animate-ping opacity-75 mr-1.5" />
+                              )}
+                              {election.status === "COMPLETED"
+                                ? "Ended"
+                                : election.status.toLowerCase()}
+                            </span>
+                          )}
+
+                          {/* Start Date */}
+                          {election.startDate && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Calendar className="w-3 h-3" />
+                              <span>{formatDate(election.startDate)}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CommandItem>
@@ -148,10 +156,17 @@ export default function GlassSearchInput({
               </CommandGroup>
             )}
 
-            {searchQuery && filteredElections.length === 0 && (
+            {searchQuery && filteredElections.length === 0 && !isLoading && (
               <CommandGroup heading="Suggestions">
-                <CommandItem disabled className="text-muted-foreground">
-                  Try searching by election name or ID
+                <CommandItem disabled className="text-muted-foreground py-3">
+                  <div className="text-center w-full">
+                    <p className="text-sm mb-1">
+                      No elections match your search
+                    </p>
+                    <p className="text-xs">
+                      Try searching by election name, ID, or status
+                    </p>
+                  </div>
                 </CommandItem>
               </CommandGroup>
             )}
