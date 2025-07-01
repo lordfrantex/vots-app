@@ -350,7 +350,8 @@ export default function CreateElectionPage() {
               <Alert variant="destructive" className="mb-6">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Contract Error:</strong> {contractError}
+                  <strong>Contract Error:</strong> Election could not be
+                  created.
                 </AlertDescription>
               </Alert>
             )}

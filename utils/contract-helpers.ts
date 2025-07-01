@@ -150,19 +150,20 @@ function convertToAddressArray(addresses: string[]): readonly `0x${string}`[] {
     ) as readonly `0x${string}`[];
 }
 
-function safeString(value: string | null | undefined): string {
+function safeString(value: any): string {
   if (value === null || value === undefined) return "";
   return String(value).trim();
 }
 
-function safeBigInt(
-  value: string | number | bigint | null | undefined,
-): bigint {
+function safeBigInt(value: any): bigint {
   if (value === null || value === undefined) return BigInt(0);
   if (typeof value === "bigint") return value;
   if (typeof value === "number") return BigInt(Math.floor(value));
-  const parsed = Number.parseInt(value, 10);
-  return isNaN(parsed) ? BigInt(0) : BigInt(parsed);
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    return isNaN(parsed) ? BigInt(0) : BigInt(parsed);
+  }
+  return BigInt(0);
 }
 
 // Helper function to mask matriculation number for polling officers
@@ -188,22 +189,21 @@ export function convertCandidateToContract(
   candidate: ExtendedCandidateInfo,
 ): ContractCandidateInfoDTO {
   return {
-    name: safeString(candidate.name || "Unknown Candidate"),
-    matricNo: safeString(candidate.matricNo || "Unknown Matric No"),
-    category: safeString(candidate.category || "Unknown Category"),
+    name: safeString(candidate.name),
+    matricNo: safeString(candidate.matricNo),
+    category: safeString(candidate.category),
     voteFor: safeBigInt(candidate.voteFor || 0),
     voteAgainst: safeBigInt(candidate.voteAgainst || 0),
   } as const;
 }
 
 // Convert frontend voter data to contract format (only blockchain fields)
-
 export function convertVoterToContract(
   voter: ExtendedVoterInfo,
 ): ContractVoterInfoDTO {
   return {
-    name: safeString(voter.name || "Unknown Voter"),
-    matricNo: safeString(voter.matricNumber || "Unknown Matric No"),
+    name: safeString(voter.name),
+    matricNo: safeString(voter.matricNumber),
   } as const;
 }
 
@@ -211,7 +211,7 @@ export function convertVoterToContract(
 export function convertCandidateFromContract(
   contractCandidate: ContractCandidateInfoDTO,
   index: number,
-  offChainData?: OffChainElectionData | null,
+  offChainData?: OffChainElectionData,
 ): ExtendedCandidateInfo {
   const candidateId = `candidate-${contractCandidate.matricNo}-${index}`;
   const metadata =
@@ -238,18 +238,26 @@ export function convertCandidateFromContract(
 export function convertVoterForPollingOfficer(
   voterResponse: ContractElectionVoterResponse,
   index: number,
+  offChainData?: OffChainElectionData,
 ): PollingOfficerVoterView {
   const voterId = `voter-po-${index}`;
-  return {
-    maskedMatricNumber: "",
+  const pollingData =
+    offChainData?.pollingOfficerVoterData?.[voterResponse.name] || {};
+
+  const convertedVoter: PollingOfficerVoterView = {
     // Limited info for polling officers
     id: voterId,
     name: voterResponse.name,
+    maskedMatricNumber:
+      pollingData.maskedMatricNumber || maskMatricNumber("UNKNOWN"),
+    photo: pollingData.photo || "/placeholder-user.jpg",
 
     // Status from blockchain - UPDATED for new voter states
     isAccredited: voterResponse.voterState >= 2, // 2 = ACCREDITED, 3 = VOTED
     hasVoted: voterResponse.voterState === 3, // 3 = VOTED
   };
+
+  return convertedVoter;
 }
 
 // Convert blockchain voter response to FULL VOTER INFO (for voting interface)
@@ -257,20 +265,29 @@ export function convertVoterForVoting(
   voterResponse: ContractElectionVoterResponse,
   fullMatricNo: string, // This comes from voter login
   index: number,
+  offChainData?: OffChainElectionData,
 ): ExtendedVoterInfo {
   const voterId = `voter-full-${fullMatricNo}-${index}`;
-  return {
+  const voterCredentials = offChainData?.voterCredentials?.[fullMatricNo] || {};
+
+  const convertedVoter: ExtendedVoterInfo = {
     // Full info for voting
     id: voterId,
     name: voterResponse.name,
     matricNumber: fullMatricNo,
 
     // Additional info from off-chain data
+    email: voterCredentials.email,
+    department: voterCredentials.department,
+    phoneNumber: voterCredentials.phoneNumber,
+    yearOfStudy: voterCredentials.yearOfStudy,
 
     // Status from blockchain - UPDATED for new voter states
     isAccredited: voterResponse.voterState >= 2, // 2 = ACCREDITED, 3 = VOTED
     hasVoted: voterResponse.voterState === 3, // 3 = VOTED
   };
+
+  return convertedVoter;
 }
 
 // Service functions for managing off-chain data
@@ -284,7 +301,7 @@ export class OffChainDataService {
     try {
       const data = localStorage.getItem(`${this.storageKey}-${electionId}`);
       return data ? JSON.parse(data) : null;
-    } catch {
+    } catch (error) {
       return null;
     }
   }
@@ -343,20 +360,23 @@ export class OffChainDataService {
     };
 
     // Save candidate metadata
-    validationData.candidates?.candidates?.forEach((candidate) => {
+    validationData.candidates?.candidates?.forEach((candidate: any) => {
       if (candidate.matricNo) {
         offChainData.candidatesMetadata[candidate.matricNo] = {
           photo: candidate.photo || "/placeholder-user.jpg",
+          biography: candidate.biography,
+          manifesto: candidate.manifesto,
         };
       }
     });
 
     // Save voter data - SPLIT into polling officer view and full credentials
-    validationData.voters?.voters?.forEach((voter) => {
+    validationData.voters?.voters?.forEach((voter: any) => {
       if (voter.matricNumber && voter.name) {
         // Limited data for polling officers (by name)
         offChainData.pollingOfficerVoterData[voter.name] = {
           maskedMatricNumber: maskMatricNumber(voter.matricNumber),
+          photo: voter.photo || "/placeholder-user.jpg",
           department: voter.department, // For ID verification only
         };
 
@@ -365,6 +385,8 @@ export class OffChainDataService {
           name: voter.name,
           email: voter.email,
           department: voter.department,
+          phoneNumber: voter.phoneNumber,
+          yearOfStudy: voter.yearOfStudy,
         };
       }
     });
@@ -402,8 +424,8 @@ export function convertVoterForPollingOfficerEnhanced(
   index: number,
   electionId: string,
 ): PollingOfficerVoterView {
-  OffChainDataService.getElectionOffChainData(electionId);
-  return convertVoterForPollingOfficer(voterResponse, index);
+  const offChainData = OffChainDataService.getElectionOffChainData(electionId);
+  return convertVoterForPollingOfficer(voterResponse, index, offChainData);
 }
 
 // For voting interface - full voter info
@@ -413,8 +435,13 @@ export function convertVoterForVotingEnhanced(
   index: number,
   electionId: string,
 ): ExtendedVoterInfo {
-  OffChainDataService.getElectionOffChainData(electionId);
-  return convertVoterForVoting(voterResponse, fullMatricNo, index);
+  const offChainData = OffChainDataService.getElectionOffChainData(electionId);
+  return convertVoterForVoting(
+    voterResponse,
+    fullMatricNo,
+    index,
+    offChainData,
+  );
 }
 
 // NEW: Convert validation data to the new ElectionParams structure
@@ -432,18 +459,20 @@ export function convertToContractElectionParams(
     const pollingOfficers = validationData.polling?.pollingOfficers || [];
 
     const candidatesList: readonly ContractCandidateInfoDTO[] = candidates.map(
-      (candidate, index: number) => {
+      (candidate: any, index: number) => {
         console.log(`Converting candidate ${index}:`, candidate);
         return convertCandidateToContract(candidate);
       },
     ) as readonly ContractCandidateInfoDTO[];
 
-    const votersList: readonly ContractVoterInfoDTO[] = voters.map((voter) => {
-      return convertVoterToContract(voter);
-    }) as readonly ContractVoterInfoDTO[];
+    const votersList: readonly ContractVoterInfoDTO[] = voters.map(
+      (voter: any, index: number) => {
+        return convertVoterToContract(voter);
+      },
+    ) as readonly ContractVoterInfoDTO[];
 
     const pollingUnitAddressStrings = pollingUnits
-      .map((unit) => safeString(unit.address))
+      .map((unit: any) => safeString(unit.address))
       .filter((address: string) => address.length > 0);
 
     const pollingUnitAddresses = convertToAddressArray(
@@ -451,15 +480,15 @@ export function convertToContractElectionParams(
     );
 
     const pollingOfficerAddressStrings = pollingOfficers
-      .map((officer) => safeString(officer.address))
+      .map((officer: any) => safeString(officer.address))
       .filter((address: string) => address.length > 0);
 
     const pollingOfficerAddresses = convertToAddressArray(
       pollingOfficerAddressStrings,
     );
 
-    const electionCategories: readonly string[] = categories.map((category) =>
-      safeString(category.name),
+    const electionCategories: readonly string[] = categories.map(
+      (category: any) => safeString(category.name),
     ) as readonly string[];
 
     let startTimeStamp: bigint;
