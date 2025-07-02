@@ -262,7 +262,7 @@ export const abi = [
         type: "tuple[]",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -402,7 +402,7 @@ export const abi = [
         type: "tuple[][]",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {

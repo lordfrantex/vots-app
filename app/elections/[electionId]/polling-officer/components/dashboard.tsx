@@ -210,10 +210,11 @@ export function Dashboard({
 
         {/* Accreditation Error Alert */}
         {accreditationError && (
-          <Alert className="bg-red-900/20 border-red-700">
+          <Alert className="bg-red-900/20 border-red-700  max-w-6xl mx-auto">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-red-300">
-              <strong>Accreditation Error:</strong> {accreditationError}
+              <strong>Accreditation Error:</strong> Voter is already accredited
+              or has voted or is not registered.
             </AlertDescription>
           </Alert>
         )}

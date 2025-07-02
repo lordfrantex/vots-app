@@ -329,7 +329,7 @@ export default function CreateElectionPage() {
   return (
     <section
       id="create-page"
-      className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20 overflow-x-hidden"
+      className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20 pb-10 overflow-x-hidden"
     >
       <div className="mx-auto">
         <div className="min-h-screen">

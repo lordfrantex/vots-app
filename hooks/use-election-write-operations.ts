@@ -15,6 +15,7 @@ import {
 } from "@/contracts/election-address";
 import type { ContractElectionParams } from "@/utils/contract-helpers";
 import type { Address } from "viem";
+import { Voter } from "@/types/voter";
 
 // Types for write operations - UPDATED for new ABI
 export interface AccreditVoterParams {
@@ -130,29 +131,34 @@ function useVoterData(electionTokenId: bigint, chainId: number) {
   };
 }
 
-// Helper function to check voter status
 function checkVoterStatus(
   voterMatricNo: string,
-  allVoters?: ElectionVoter[],
-  accreditedVoters?: ElectionVoter[],
-  votedVoters?: ElectionVoter[],
+  allVoters?: Voter[], // Change from ElectionVoter[] to Voter[]
+  accreditedVoters?: Voter[], // Change from ElectionVoter[] to Voter[]
+  votedVoters?: Voter[], // Change from ElectionVoter[] to Voter[]
 ) {
-  // Check if voter is registered
+  // Check if voter is registered by matric number
   const isRegistered =
     allVoters?.some(
-      (voter) => voter.name.toLowerCase() === voterMatricNo.toLowerCase(),
+      // CORRECTED: Compare matricNo with matricNo
+      (voter) =>
+        voter.matricNumber.toLowerCase() === voterMatricNo.toLowerCase(),
     ) ?? false;
 
-  // Check if voter is accredited
+  // Check if voter is accredited by matric number
   const isAccredited =
     accreditedVoters?.some(
-      (voter) => voter.name.toLowerCase() === voterMatricNo.toLowerCase(),
+      // CORRECTED: Compare matricNo with matricNo
+      (voter) =>
+        voter.matricNumber.toLowerCase() === voterMatricNo.toLowerCase(),
     ) ?? false;
 
-  // Check if voter has voted
+  // Check if voter has voted by matric number
   const hasVoted =
     votedVoters?.some(
-      (voter) => voter.name.toLowerCase() === voterMatricNo.toLowerCase(),
+      // CORRECTED: Compare matricNo with matricNo
+      (voter) =>
+        voter.matricNumber.toLowerCase() === voterMatricNo.toLowerCase(),
     ) ?? false;
 
   return {
@@ -279,6 +285,9 @@ export function useCreateElection() {
 }
 
 // ENHANCED Hook for accrediting voters with validation
+// Hook for accrediting voters - UPDATED for new ABI
+// FIXED Hook for accrediting voters with proper validation
+// SIMPLIFIED Hook for accrediting voters - just try and give basic feedback
 export function useAccreditVoter() {
   const { address } = useAccount();
   const chainId = useChainId();
@@ -301,9 +310,6 @@ export function useAccreditVoter() {
       params: AccreditVoterParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
       console.log("=== ACCREDIT VOTER START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
       console.log("Params:", params);
 
       if (!address) {
@@ -329,116 +335,39 @@ export function useAccreditVoter() {
       setError(null);
 
       try {
-        // Step 1: Read all voters to check if voter is registered
-        console.log("Checking if voter is registered...");
-        const allVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!allVotersResult.ok) {
-          throw new Error("Failed to fetch voter data");
-        }
-
-        const allVoters: ElectionVoter[] = await allVotersResult.json();
-
-        // Check if voter is registered
-        const isRegistered = allVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (!isRegistered) {
-          const errorMsg = `Voter with matric number "${params.voterMatricNo}" is not registered for this election. Please ensure the voter is registered first.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("Voter is registered. Checking accreditation status...");
-
-        // Step 2: Read accredited voters to check if already accredited
-        const accreditedVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllAccreditedVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!accreditedVotersResult.ok) {
-          throw new Error("Failed to fetch accredited voters data");
-        }
-
-        const accreditedVoters: ElectionVoter[] =
-          await accreditedVotersResult.json();
-
-        // Check if voter is already accredited
-        const isAlreadyAccredited = accreditedVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (isAlreadyAccredited) {
-          const errorMsg = `Voter "${params.voterMatricNo}" has already been accredited for this election.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("Voter is eligible for accreditation. Proceeding...");
-
-        // Step 3: Proceed with accreditation
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: accrediteVoter");
-        console.log("- Args:", [params.voterMatricNo, params.electionTokenId]);
+        console.log("Calling accreditVoter function...");
 
         writeContract({
           abi,
           address: contractAddress,
           functionName: "accrediteVoter",
-          args: [params.voterMatricNo, params.electionTokenId],
+          args: [params.voterMatricNo, params.electionTokenId], // voterMatricNo, pollingOfficerAddress
         });
-
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
 
         return {
           success: true,
-          message: `Accreditation transaction submitted for voter ${params.voterMatricNo}! Please confirm in MetaMask and wait for blockchain confirmation.`,
+          message: `Voter ${params.voterMatricNo} has been accredited! Please confirm the transaction.`,
           hash: hash,
         };
       } catch (err) {
-        console.error("=== ACCREDIT VOTER ERROR ===");
-        console.error("Error details:", err);
-        console.error("Write error:", writeError);
+        console.error("Accredit error:", err);
 
-        let errorMessage = "Failed to accredit voter";
+        let errorMessage = "Voter not registered";
 
         if (err instanceof Error) {
           if (err.message.includes("User rejected")) {
             errorMessage = "Transaction was rejected by user";
           } else if (err.message.includes("insufficient funds")) {
             errorMessage = "Insufficient funds for gas fees";
-          } else if (err.message.includes("execution reverted")) {
-            errorMessage = "Transaction failed: " + err.message;
-          } else if (err.message.includes("not registered")) {
-            errorMessage = err.message; // Use our custom error message
-          } else if (err.message.includes("already been accredited")) {
-            errorMessage = err.message; // Use our custom error message
+          } else if (err.message.includes("VoterAlreadyAccredited")) {
+            errorMessage = "Voter has already been accredited";
+          } else if (
+            err.message.includes("VoterNotRegistered") ||
+            err.message.includes("noUnknown")
+          ) {
+            errorMessage = "Voter not registered";
           } else {
-            errorMessage = err.message;
+            errorMessage = "Voter not registered";
           }
         }
 
@@ -446,7 +375,6 @@ export function useAccreditVoter() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== ACCREDIT VOTER END ===");
       }
     },
     [address, chainId, writeContract, hash, writeError],
@@ -465,7 +393,6 @@ export function useAccreditVoter() {
     isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }
-
 // ENHANCED Hook for validating voter for voting with comprehensive checks
 export function useValidateVoterForVoting() {
   const { address } = useAccount();
@@ -489,9 +416,6 @@ export function useValidateVoterForVoting() {
       params: ValidateVoterForVotingParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
       console.log("=== VALIDATE VOTER FOR VOTING START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
       console.log("Params:", params);
 
       if (!address) {
@@ -517,163 +441,45 @@ export function useValidateVoterForVoting() {
       setError(null);
 
       try {
-        console.log("Starting comprehensive voter validation...");
-
-        // Step 1: Check if voter is registered
-        console.log("Step 1: Checking voter registration...");
-        const allVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!allVotersResult.ok) {
-          throw new Error("Failed to fetch registered voters data");
-        }
-
-        const allVoters: ElectionVoter[] = await allVotersResult.json();
-
-        const isRegistered = allVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (!isRegistered) {
-          const errorMsg = `Voter with matric number "${params.voterMatricNo}" is not registered for this election. Please contact the election administrator.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("✓ Voter is registered");
-
-        // Step 2: Check if voter is accredited
-        console.log("Step 2: Checking voter accreditation...");
-        const accreditedVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllAccreditedVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!accreditedVotersResult.ok) {
-          throw new Error("Failed to fetch accredited voters data");
-        }
-
-        const accreditedVoters: ElectionVoter[] =
-          await accreditedVotersResult.json();
-
-        const isAccredited = accreditedVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (!isAccredited) {
-          const errorMsg = `Voter "${params.voterMatricNo}" has not been accredited yet. Please visit the polling officer to get accredited before voting.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("✓ Voter is accredited");
-
-        // Step 3: Check if voter has already voted
-        console.log("Step 3: Checking if voter has already voted...");
-        const votedVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllVotedVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!votedVotersResult.ok) {
-          throw new Error("Failed to fetch voted voters data");
-        }
-
-        const votedVoters: ElectionVoter[] = await votedVotersResult.json();
-
-        const hasAlreadyVoted = votedVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (hasAlreadyVoted) {
-          const errorMsg = `Voter "${params.voterMatricNo}" has already cast their vote in this election. Each voter can only vote once.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("✓ Voter has not voted yet");
-        console.log(
-          "All validation checks passed. Proceeding with voter validation...",
-        );
-
-        // Step 4: Proceed with validation for voting
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: validateVoterForVoting");
-        console.log("- Args:", [
-          params.voterMatricNo,
-          params.voterName,
-          params.electionTokenId,
-        ]);
+        console.log("Calling validateVoterForVoting function...");
 
         writeContract({
           abi,
           address: contractAddress,
           functionName: "validateVoterForVoting",
           args: [
-            params.voterMatricNo,
             params.voterName,
+            params.voterMatricNo,
             params.electionTokenId,
           ],
         });
 
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
-
         return {
           success: true,
-          message: `Voter validation successful for ${params.voterMatricNo}! You are eligible to vote. Please confirm the transaction and proceed to cast your ballot.`,
+          message: `Voter ${params.voterName} (${params.voterMatricNo}) has been validated for voting! Please confirm the transaction.`,
           hash: hash,
         };
       } catch (err) {
-        console.error("=== VALIDATE VOTER FOR VOTING ERROR ===");
-        console.error("Error details:", err);
-        console.error("Write error:", writeError);
+        console.error("Validate voter error:", err);
 
-        let errorMessage = "Failed to validate voter for voting";
+        let errorMessage = "Voter validation failed";
 
         if (err instanceof Error) {
           if (err.message.includes("User rejected")) {
             errorMessage = "Transaction was rejected by user";
           } else if (err.message.includes("insufficient funds")) {
             errorMessage = "Insufficient funds for gas fees";
-          } else if (err.message.includes("execution reverted")) {
-            errorMessage = "Transaction failed: " + err.message;
-          } else if (err.message.includes("not registered")) {
-            errorMessage = err.message; // Use our custom error message
-          } else if (err.message.includes("not been accredited")) {
-            errorMessage = err.message; // Use our custom error message
-          } else if (err.message.includes("already cast their vote")) {
-            errorMessage = err.message; // Use our custom error message
+          } else if (err.message.includes("VoterNotAccredited")) {
+            errorMessage = "Voter has not been accredited yet";
+          } else if (err.message.includes("VoterAlreadyVoted")) {
+            errorMessage = "Voter has already voted";
+          } else if (
+            err.message.includes("VoterNotRegistered") ||
+            err.message.includes("noUnknown")
+          ) {
+            errorMessage = "Voter not registered";
           } else {
-            errorMessage = err.message;
+            errorMessage = "Voter validation failed";
           }
         }
 
@@ -681,7 +487,6 @@ export function useValidateVoterForVoting() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== VALIDATE VOTER FOR VOTING END ===");
       }
     },
     [address, chainId, writeContract, hash, writeError],
@@ -700,7 +505,6 @@ export function useValidateVoterForVoting() {
     isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }
-
 // Hook for validating polling officers - keeping original implementation
 export function useValidatePollingOfficer() {
   const { address } = useAccount();
@@ -1027,6 +831,7 @@ export function useVoteCandidates() {
     error,
     hash,
     chainId,
+    isConfirming,
     contractAddress: getContractAddress(chainId),
     isChainSupported: validateChainSupport(chainId).isSupported,
   };

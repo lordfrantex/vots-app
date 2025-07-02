@@ -46,27 +46,31 @@ const VoteConfirmationModal = ({
 }: VoteConfirmationModalProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-slate-900/95 backdrop-blur-xl border-slate-700/50 text-white max-w-md">
+      <DialogContent className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-slate-200/70 dark:border-slate-700/50 text-slate-900 dark:text-white max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-xl">
+          <DialogTitle className="text-center text-xl text-slate-900 dark:text-white">
             Confirm Your Vote
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Voter Info */}
-          <div className="bg-slate-800/50 p-4 rounded-lg">
-            <h4 className="font-medium text-slate-300 mb-2">
+          <div className="bg-slate-100/80 dark:bg-slate-800/50 p-4 rounded-lg">
+            <h4 className="font-medium text-slate-600 dark:text-slate-300 mb-2">
               Voter Information
             </h4>
             <div className="space-y-1">
               <p className="text-sm">
-                <span className="text-slate-400">Name:</span>{" "}
-                <span className="text-white">{voter.name}</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  Name:
+                </span>{" "}
+                <span className="text-slate-800 dark:text-white">
+                  {voter.name}
+                </span>
               </p>
               <p className="text-sm">
-                <span className="text-slate-400">ID:</span>{" "}
-                <span className="text-white font-mono">
+                <span className="text-slate-500 dark:text-slate-400">ID:</span>{" "}
+                <span className="text-slate-800 dark:text-white font-mono">
                   {voter.matricNumber}
                 </span>
               </p>
@@ -74,8 +78,10 @@ const VoteConfirmationModal = ({
           </div>
 
           {/* Vote Summary */}
-          <div className="bg-slate-800/50 p-4 rounded-lg">
-            <h4 className="font-medium text-slate-300 mb-3">Your Selections</h4>
+          <div className="bg-slate-100/80 dark:bg-slate-800/50 p-4 rounded-lg">
+            <h4 className="font-medium text-slate-600 dark:text-slate-300 mb-3">
+              Your Selections
+            </h4>
             <div className="space-y-3">
               {Object.entries(selections).map(([category, selection]) => (
                 <div
@@ -83,8 +89,10 @@ const VoteConfirmationModal = ({
                   className="flex justify-between items-center"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white">{category}</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm font-medium text-slate-800 dark:text-white">
+                      {category}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       {selection.candidateName}
                     </p>
                   </div>
@@ -92,8 +100,8 @@ const VoteConfirmationModal = ({
                     <Badge
                       className={`${
                         selection.voteType === "for"
-                          ? "bg-green-500/20 text-green-400 border-green-500/50"
-                          : "bg-red-500/20 text-red-400 border-red-500/50"
+                          ? "bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-300 dark:border-green-500/50"
+                          : "bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400 border-red-300 dark:border-red-500/50"
                       }`}
                     >
                       {selection.voteType === "for" ? (
@@ -104,7 +112,7 @@ const VoteConfirmationModal = ({
                       {selection.voteType.toUpperCase()}
                     </Badge>
                   ) : (
-                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/50">
+                    <Badge className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/50">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Selected
                     </Badge>
@@ -115,9 +123,9 @@ const VoteConfirmationModal = ({
           </div>
 
           {/* Warning */}
-          <Alert className="bg-red-900/20 border-red-700/50">
-            <AlertTriangle className="h-4 w-4 text-red-400" />
-            <AlertDescription className="text-red-300">
+          <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50">
+            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-700 dark:text-red-300">
               <strong>Final Warning:</strong> Once you submit your vote, it
               cannot be changed or undone.
             </AlertDescription>
@@ -128,7 +136,7 @@ const VoteConfirmationModal = ({
             <Button
               onClick={onClose}
               variant="outline"
-              className="flex-1 bg-transparent"
+              className="flex-1 bg-transparent border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               disabled={isSubmitting}
             >
               Cancel
@@ -136,7 +144,7 @@ const VoteConfirmationModal = ({
             <Button
               onClick={onConfirm}
               disabled={isSubmitting}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              className="flex-1 bg-[#324278] hover:bg-blue-900 cursor-pointer text-white"
             >
               {isSubmitting ? (
                 <>

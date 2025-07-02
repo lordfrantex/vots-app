@@ -8,6 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   CheckCircle,
   AlertTriangle,
   Loader2,
@@ -112,10 +118,10 @@ const VoterAuthenticationModal = ({
         electionTokenId,
       });
 
-      // Call the blockchain validation function
+      // Call the blockchain validation function with updated parameter names
       const result = await validateVoterForVoting({
-        voterMatricNo: matricNumber.trim(),
-        voterName: fullName.trim(),
+        name: fullName.trim(),
+        matric: matricNumber.trim(),
         electionTokenId: electionTokenId,
       });
 
@@ -304,34 +310,41 @@ const VoterAuthenticationModal = ({
           </CardContent>
         </Card>
 
-        {/* Authentication Success */}
-        {authenticationResult?.success && authenticationResult.voter && (
-          <Card className="bg-green-400/10 dark:bg-green-900/20 backdrop-blur-xl border-green-500/50 dark:border-green-700/50">
-            <CardHeader>
+        {/* Authentication Success Dialog */}
+        <Dialog
+          open={authenticationResult?.success && !!authenticationResult.voter}
+          onOpenChange={() => {
+            // Prevent closing the dialog by clicking outside or escape
+            // User must click "Proceed to Vote" button
+          }}
+        >
+          <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border-green-500/50">
+            <DialogHeader>
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="h-8 w-8 text-green-700 dark:text-green-400" />
                 </div>
-                <CardTitle className="text-green-700 dark:text-green-400">
+                <DialogTitle className="text-green-700 dark:text-green-400 text-xl">
                   Authentication Successful
-                </CardTitle>
+                </DialogTitle>
                 <p className="text-green-600 dark:text-green-400 text-sm mt-2">
                   You have been verified and can now proceed to vote
                 </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            </DialogHeader>
+
+            <div className="space-y-4 mt-4">
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Name:</span>
                   <span className="font-medium">
-                    {authenticationResult.voter.name}
+                    {authenticationResult?.voter?.name}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Matriculation:</span>
                   <span className="font-mono">
-                    {authenticationResult.voter.matricNumber}
+                    {authenticationResult?.voter?.matricNumber}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -349,9 +362,9 @@ const VoterAuthenticationModal = ({
                 <ArrowRight className="mr-2 h-4 w-4" />
                 Proceed to Vote
               </Button>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="text-center">
           <p className="text-xs text-slate-500">

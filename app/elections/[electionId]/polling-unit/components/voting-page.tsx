@@ -54,16 +54,20 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState("");
   const [votingEnded, setVotingEnded] = useState(false);
-  const [voteSubmitted, setVoteSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
 
   // Use the consolidated hook for election details
-  const { election, isLoading, error } = useElectionDetails(electionId);
+  const { election, error } = useElectionDetails(electionId);
 
-  // Voting hook
+  // Voting hook - get the transaction states from the hook
   const {
     voteCandidates,
-    isLoading: isVoting,
+    isLoading: isCreating,
+    isSuccess,
     error: votingError,
+    hash,
+    isConfirming,
   } = useVoteCandidates();
 
   // Group candidates by category
@@ -89,6 +93,24 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     categories.length > 0
       ? (selectedCategories.length / categories.length) * 100
       : 0;
+
+  // Handle success state - similar to create-election page
+  useEffect(() => {
+    if (isSuccess) {
+      setIsConfirmed(true);
+      toast.success("Vote submitted successfully!");
+      setTimeout(() => {
+        onBack();
+      }, 3000);
+    }
+  }, [isSuccess, onBack]);
+
+  // Handle contract errors
+  useEffect(() => {
+    if (votingError) {
+      toast.error("Failed to submit vote");
+    }
+  }, [votingError]);
 
   // Update countdown timer
   useEffect(() => {
@@ -154,12 +176,18 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     }));
   };
 
+  // Simplified submit handler - similar to create-election page
   const handleSubmitVote = async () => {
     if (selectedCategories.length !== categories.length || votingEnded) {
       return;
     }
 
+    console.log("=== VOTE SUBMISSION START ===");
+
     try {
+      setIsSubmitting(true);
+      setShowConfirmation(false);
+
       // Convert selections to contract format
       const candidatesList = Object.entries(selections).map(
         ([category, selection]) => ({
@@ -171,6 +199,9 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         }),
       );
 
+      console.log("Vote selections:", candidatesList);
+
+      // Submit to blockchain using the hook
       const result = await voteCandidates({
         voterMatricNo: voter.matricNumber,
         voterName: voter.name,
@@ -178,40 +209,24 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         electionTokenId: BigInt(electionId),
       });
 
-      if (result.success) {
-        setVoteSubmitted(true);
-        setShowConfirmation(false);
+      console.log("Blockchain submission result:", result);
 
-        // Show success toast
-        toast.success("Your vote has been submitted successfully!", {
-          duration: 4000,
-          position: "top-center",
-          style: {
-            background: "#10B981",
-            color: "#FFFFFF",
-          },
-        });
-
-        // Wait for 3 seconds before going back to allow user to see the success state
-        setTimeout(() => {
-          onBack();
-        }, 7000);
+      if (!result.success) {
+        toast.error("Failed to submit vote");
       }
     } catch (error) {
-      console.error("Voting error:", error);
-      toast.error("Failed to submit vote. Please try again.", {
-        duration: 4000,
-        position: "top-center",
-        style: {
-          background: "#EF4444",
-          color: "#FFFFFF",
-        },
-      });
+      console.error("Error in vote submission:", error);
+      toast.error("Unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
+      console.log("=== VOTE SUBMISSION END ===");
     }
   };
 
+  const isLoading = isSubmitting || isCreating || isConfirming;
+
   // Loading state
-  if (isLoading) {
+  if (isLoading && !election) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center space-y-4">
@@ -246,9 +261,9 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const isVotingEnded = election.status === "COMPLETED" || votingEnded;
 
   // Vote submitted success state
-  if (voteSubmitted) {
+  if (isConfirmed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-6">
           <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
             <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
@@ -258,8 +273,13 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
               Vote Submitted Successfully!
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              Thank you for participating in the election.
+              Your vote has been recorded on the blockchain.
             </p>
+            {hash && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+              </p>
+            )}
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Redirecting you back to the authentication page...
             </p>
@@ -623,12 +643,12 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                   onClick={() => setShowConfirmation(true)}
                   disabled={
                     selectedCategories.length !== categories.length ||
-                    isVoting ||
+                    isConfirming ||
                     isVotingEnded
                   }
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 h-12 disabled:opacity-50"
+                  className="flex-1 bg-[#324278] hover:bg-blue-900 cursor-pointer text-white font-medium py-3 h-12 disabled:opacity-50"
                 >
-                  {isVoting ? (
+                  {isConfirming ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Submitting Vote...
@@ -642,9 +662,9 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                 </Button>
               </div>
 
-              <Alert className="mt-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50">
-                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertDescription className="text-red-700 dark:text-red-300">
+              <Alert className="mt-4 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-amber-700 dark:text-amber-300">
                   <strong>Warning:</strong> Once submitted, you cannot change
                   your vote. Please review your selections carefully.
                 </AlertDescription>
@@ -661,7 +681,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         onConfirm={handleSubmitVote}
         selections={selections}
         voter={voter}
-        isSubmitting={isVoting}
+        isSubmitting={isSubmitting}
       />
     </div>
   );
