@@ -79,7 +79,7 @@ const VoterAuthenticationModal = ({
 
   // Handle validation success
   useEffect(() => {
-    if (isValidationSuccess) {
+    if (isValidationSuccess && validationHash) {
       console.log("Voter validation successful");
       setAuthenticationResult({
         success: true,
@@ -91,37 +91,59 @@ const VoterAuthenticationModal = ({
         },
       });
     }
-  }, [isValidationSuccess, fullName, matricNumber]);
+  }, [isValidationSuccess, validationHash, fullName, matricNumber]);
 
   // Handle contract errors
   useEffect(() => {
     if (contractError) {
       console.error("Voter validation error:", contractError);
+      let errorMessage = contractError;
+
+      // Map contract errors to user-friendly messages
+      if (contractError.includes("VoterNotAccredited")) {
+        errorMessage =
+          "Voter has not been accredited yet. Please contact election officials.";
+      } else if (contractError.includes("VoterAlreadyVoted")) {
+        errorMessage = "Voter has already voted in this election.";
+      } else if (contractError.includes("VoterNotRegistered")) {
+        errorMessage = "Voter is not registered for this election.";
+      } else if (contractError.includes("InvalidVoterDetails")) {
+        errorMessage =
+          "Invalid voter details. Please check your name and matriculation number.";
+      } else if (contractError.includes("ElectionNotActive")) {
+        errorMessage = "Election is not currently active.";
+      }
+
       setAuthenticationResult({
         success: false,
-        error: contractError,
+        error: errorMessage,
       });
     }
   }, [contractError]);
 
   const handleAuthenticate = async () => {
     if (!matricNumber.trim() || !fullName.trim()) {
+      setAuthenticationResult({
+        success: false,
+        error: "Please enter both your name and matriculation number.",
+      });
       return;
     }
 
+    // Clear previous results
     setAuthenticationResult(null);
 
     try {
       console.log("Validating voter for voting:", {
-        matricNumber,
-        fullName,
-        electionTokenId,
+        matricNumber: matricNumber.trim(),
+        fullName: fullName.trim(),
+        electionTokenId: electionTokenId.toString(),
       });
 
-      // Call the blockchain validation function with updated parameter names
+      // Call the blockchain validation function with CORRECT parameter names
       const result = await validateVoterForVoting({
-        name: fullName.trim(),
-        matric: matricNumber.trim(),
+        voterName: fullName.trim(),
+        voterMatricNo: matricNumber.trim(),
         electionTokenId: electionTokenId,
       });
 
@@ -131,12 +153,13 @@ const VoterAuthenticationModal = ({
           error: result.message,
         });
       }
-      // Success will be handled by the useEffect above
+      // Success will be handled by the useEffect above when transaction confirms
     } catch (err) {
       console.error("Authentication error:", err);
       setAuthenticationResult({
         success: false,
-        error: "Authentication failed. Please try again.",
+        error:
+          "Authentication failed. Please check your details and try again.",
       });
     }
   };
@@ -152,6 +175,13 @@ const VoterAuthenticationModal = ({
   };
 
   const isProcessing = isValidating || isContractPending || isConfirming;
+
+  // Reset authentication result when form is cleared
+  useEffect(() => {
+    if (!matricNumber.trim() && !fullName.trim()) {
+      setAuthenticationResult(null);
+    }
+  }, [matricNumber, fullName]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">

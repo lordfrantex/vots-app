@@ -249,15 +249,12 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
-          { internalType: "uint256", name: "votes", type: "uint256" },
-          { internalType: "uint256", name: "votesAgainst", type: "uint256" },
-          {
-            internalType: "enum IElection.CandidateState",
-            name: "state",
-            type: "uint8",
-          },
+          { internalType: "string", name: "matricNo", type: "string" },
+          { internalType: "string", name: "category", type: "string" },
+          { internalType: "uint256", name: "voteFor", type: "uint256" },
+          { internalType: "uint256", name: "voteAgainst", type: "uint256" },
         ],
-        internalType: "struct IElection.ElectionCandidate[]",
+        internalType: "struct IElection.CandidateInfoDTO[]",
         name: "",
         type: "tuple[]",
       },

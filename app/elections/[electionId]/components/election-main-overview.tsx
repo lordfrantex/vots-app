@@ -5,8 +5,9 @@ import CountdownTimer from "@/components/ui/countdown-timer";
 import StatCard from "@/app/elections/[electionId]/components/election-stat-card";
 import { Separator } from "@/components/ui/separator";
 import { FaUsers } from "react-icons/fa6";
-import { FaVoteYea } from "react-icons/fa";
+import { FaCheck, FaVoteYea } from "react-icons/fa";
 import { HiMiniChartBar } from "react-icons/hi2";
+import { CheckmarkIcon } from "react-hot-toast";
 
 interface ElectionMainOverviewProps {
   election: Election;
@@ -65,11 +66,16 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
         <StatCard
           title="Registered Voters"
           value={(election?.totalVoters ?? 0).toLocaleString()}
           icon={<FaUsers />}
+        />
+        <StatCard
+          title="Accredited Voters"
+          value={(election?.accreditedVoters ?? 0).toLocaleString()}
+          icon={<FaCheck />}
         />
         <StatCard
           title="Votes Cast"

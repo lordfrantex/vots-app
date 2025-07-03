@@ -30,16 +30,16 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
   canViewResults = false,
 }) => {
   const [open, setOpen] = React.useState(false);
-  const [activeCategory, setActiveCategory] = useState<Category>(
-    election.categories[0],
+  const [activeCategory, setActiveCategory] = useState<string>(
+    election.categories[0]?.name || "",
   );
 
   // Memoize the results calculation to avoid recalculation
   const resultsByCategory = useMemo(() => {
-    // Group candidates by category and sort by votes
+    // Group candidates by category name and sort by votes
     const results = (election?.candidates ?? []).reduce(
       (acc, candidate) => {
-        const category = candidate.category as string;
+        const category = candidate.category;
         if (!acc[category]) {
           acc[category] = [];
         }
@@ -69,71 +69,37 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
   // Handle category change - this will control both results and chart
   const handleCategoryChange = (category: string) => {
-    setActiveCategory(category as unknown as Category);
+    setActiveCategory(category);
   };
 
-  // Render candidate card
   const renderCandidateCard = (
     candidate: Candidate,
     index: number,
-    category: string,
+    categoryName: string,
   ) => {
-    const categoryTotalVotes = getCategoryTotalVotes(category);
-    const percentage =
-      categoryTotalVotes > 0
-        ? (((candidate.voteCount || 0) / categoryTotalVotes) * 100).toFixed(1)
-        : "0";
-    const isWinner = index === 0 && (candidate.voteCount || 0) > 0;
-
     return (
       <div
-        key={candidate.id}
-        className={`bg-[#D6DADD]/30 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-300 dark:border-gray-600 relative transition-all duration-200 ${
-          isWinner ? "ring-2 ring-indigo-600" : "border-slate-300"
-        }`}
+        key={`${categoryName}-${candidate.id}-${index}`}
+        className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md"
       >
-        {/* Winner Badge */}
-        {isWinner && (
-          <div className="absolute top-3 right-3 bg-gradient-to-tr from-[#254192] to-[#192E69] text-white  px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
-            <Trophy className="w-3 h-3" />
-            Winner
-          </div>
-        )}
-
-        <div className="flex items-center gap-4 mb-3">
-          {/* Avatar */}
-          <div
-            className={`
-          w-16 h-16 rounded-full bg-gradient-to-b dark:from-slate-600 dark:via-55% dark:to-gray-500/40 border border-gray-500/30
-          flex items-center justify-center text-white font-bold text-lg mb-3
-          shadow-2xl
-        `}
-          >
-            <FaUser
-              size={24}
-              className="text-indigo-400/40 dark:text-indigo-300/40"
-            />
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+            <FaUser className="text-gray-500 dark:text-gray-400" />
           </div>
 
-          {/* Candidate Info */}
-          <div className="flex-1">
-            <h4 className="font-semibold text-lg">{candidate.name}</h4>
-            <p className="text-sm text-slate-400">ID: {candidate.matricNo}</p>
+          <div>
+            <p className="text-lg font-medium text-gray-900 dark:text-white">
+              {candidate.name}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Matric No: {candidate.matricNo}
+            </p>
           </div>
         </div>
-
-        {/* Vote Count and Percentage */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="font-medium">{candidate.voteCount || 0} votes</div>
-          <div className="text-indigo-400 font-semibold">{percentage}%</div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-500 rounded-full h-2">
-          <div
-            className="bg-gradient-to-r from-indigo-500 to-blue-400 h-2 rounded-full transition-all duration-500 ease-out"
-            style={{ width: `${percentage}%` }}
-          ></div>
+        <div>
+          <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+            {candidate.voteCount || 0} Votes
+          </p>
         </div>
       </div>
     );
@@ -225,53 +191,48 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
           {/* Single Tabs for Both Results and Chart */}
           <Tabs
-            defaultValue={election.categories[0] as unknown as string}
-            value={activeCategory as unknown as string}
+            defaultValue={election.categories[0]?.name || ""}
+            value={activeCategory}
             onValueChange={handleCategoryChange}
           >
             <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50">
               {election.categories.map((category) => (
                 <TabsTrigger
-                  key={category as unknown as string}
-                  value={category as unknown as string}
+                  key={category.id}
+                  value={category.name}
                   className={cn(
                     "bg-gray-50 dark:bg-[#0F172C] text-gray-400 dark:text-[#697AA1] font-medium cursor-pointer",
-                    activeCategory === category &&
+                    activeCategory === category.name &&
                       "font-bold text-white data-[state=active]:bg-indigo-600 data-[state=active]:bg-gradient-to-tr from-[#254192] to-[#192E69]",
                   )}
                 >
-                  {category as unknown as string}
+                  {category.name}
                 </TabsTrigger>
               ))}
             </TabsList>
 
             {election.categories.map((category) => (
               <TabsContent
-                key={category as unknown as string}
-                value={category as unknown as string}
+                key={category.id}
+                value={category.name}
                 className="space-y-6"
               >
                 {/* Candidate Results */}
                 <Card className="bg-gray-50 dark:bg-gray-900 p-4 py-10 rounded-lg shadow-xl dark:shadow-2xl">
                   <CardHeader>
                     <CardTitle className="text-lg">
-                      {category as unknown as string} - Candidates
+                      {category.name} - Candidates
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {resultsByCategory[category as unknown as string]?.map(
+                      {resultsByCategory[category.name]?.map(
                         (candidate, index) =>
-                          renderCandidateCard(
-                            candidate,
-                            index,
-                            category as unknown as string,
-                          ),
+                          renderCandidateCard(candidate, index, category.name),
                       ) || (
                         <div className="text-center py-8">
                           <p className="text-gray-500 dark:text-gray-400">
-                            No candidates found for{" "}
-                            {category as unknown as string}
+                            No candidates found for {category.name}
                           </p>
                         </div>
                       )}
@@ -282,7 +243,7 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
                 {/* Vote Analysis Chart - No tabs, just the chart */}
                 <ElectionChart
                   election={election}
-                  selectedCategory={activeCategory as unknown as string}
+                  selectedCategory={activeCategory}
                   resultsByCategory={resultsByCategory}
                   showCategoryTabs={false} // Hide category tabs in chart
                   showChartTypeToggle={true} // Keep chart type toggle

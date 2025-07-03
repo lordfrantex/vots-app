@@ -16,6 +16,7 @@ export interface Election {
   categories: Category[];
   totalVoters?: number;
   totalVotes?: number;
+  accreditedVoters?: number;
   candidates?: Candidate[];
   voters: Voter[];
 

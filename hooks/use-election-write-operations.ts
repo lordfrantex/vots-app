@@ -90,7 +90,7 @@ function useVoterData(electionTokenId: bigint, chainId: number) {
     args: [electionTokenId],
     query: {
       enabled: !!contractAddress && electionTokenId > 0n,
-      staleTime: 1000 * 30, // 30 seconds
+      staleTime: 0,
     },
   });
 
@@ -103,7 +103,7 @@ function useVoterData(electionTokenId: bigint, chainId: number) {
       args: [electionTokenId],
       query: {
         enabled: !!contractAddress && electionTokenId > 0n,
-        staleTime: 1000 * 30, // 30 seconds
+        staleTime: 0,
       },
     });
 
@@ -115,7 +115,7 @@ function useVoterData(electionTokenId: bigint, chainId: number) {
     args: [electionTokenId],
     query: {
       enabled: !!contractAddress && electionTokenId > 0n,
-      staleTime: 1000 * 30, // 30 seconds
+      staleTime: 0,
     },
   });
 
@@ -393,6 +393,7 @@ export function useAccreditVoter() {
     isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }
+
 // ENHANCED Hook for validating voter for voting with comprehensive checks
 export function useValidateVoterForVoting() {
   const { address } = useAccount();
@@ -448,15 +449,17 @@ export function useValidateVoterForVoting() {
           address: contractAddress,
           functionName: "validateVoterForVoting",
           args: [
-            params.voterName,
             params.voterMatricNo,
+            params.voterName,
             params.electionTokenId,
           ],
         });
 
+        // Don't return success immediately - let the transaction be processed
+        // The success will be determined by the transaction receipt
         return {
           success: true,
-          message: `Voter ${params.voterName} (${params.voterMatricNo}) has been validated for voting! Please confirm the transaction.`,
+          message: `Validation transaction submitted for ${params.voterName} (${params.voterMatricNo}). Please confirm the transaction.`,
           hash: hash,
         };
       } catch (err) {
@@ -478,6 +481,10 @@ export function useValidateVoterForVoting() {
             err.message.includes("noUnknown")
           ) {
             errorMessage = "Voter not registered";
+          } else if (err.message.includes("InvalidVoterDetails")) {
+            errorMessage = "Invalid voter details provided";
+          } else if (err.message.includes("ElectionNotActive")) {
+            errorMessage = "Election is not currently active";
           } else {
             errorMessage = "Voter validation failed";
           }

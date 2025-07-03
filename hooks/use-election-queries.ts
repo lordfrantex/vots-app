@@ -30,7 +30,7 @@ export const useElections = () => {
   const query = useQuery<Election[]>({
     queryKey: electionKeys.lists(),
     queryFn: fetchElections,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   if (query.isLoading) {
@@ -55,7 +55,7 @@ export const useElection = (electionId: string) => {
     queryKey: electionKeys.detail(electionId),
     queryFn: () => fetchElection(electionId),
     enabled: !!electionId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
   });
 
   if (query.isLoading) {
