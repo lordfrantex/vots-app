@@ -25,6 +25,7 @@ import VoteConfirmationModal from "./vote-confirmation-modal";
 import type { Candidate } from "@/types/candidate";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { usePreAuthVoting } from "@/hooks/use-pre-auth-voting";
 
 interface VotingPageProps {
   electionId: string;
@@ -56,7 +57,10 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const [votingEnded, setVotingEnded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
+  const { initializeSession, executeVote, isSessionActive } =
+    usePreAuthVoting();
   // Use the consolidated hook for election details
   const { election, error } = useElectionDetails(electionId);
 
@@ -93,6 +97,26 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     categories.length > 0
       ? (selectedCategories.length / categories.length) * 100
       : 0;
+
+  useEffect(() => {
+    const setupVotingSession = async () => {
+      setIsInitializing(true);
+      try {
+        if (!isSessionActive) {
+          const success = await initializeSession(30);
+          if (!success) {
+            toast.error(
+              "Failed to initialize voting session. Please try again.",
+            );
+          }
+        }
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    setupVotingSession();
+  }, [initializeSession, isSessionActive]);
 
   // Handle success state - similar to create-election page
   useEffect(() => {
@@ -201,8 +225,8 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
       console.log("Vote selections:", candidatesList);
 
-      // Submit to blockchain using the hook
-      const result = await voteCandidates({
+      // Execute pre-authorized vote
+      const result = await executeVote({
         voterMatricNo: voter.matricNumber,
         voterName: voter.name,
         candidatesList,
@@ -213,7 +237,17 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
       if (!result.success) {
         toast.error("Failed to submit vote");
+        return;
       }
+
+      // Set success state
+      setIsConfirmed(true);
+      toast.success("Vote submitted successfully!");
+
+      // Redirect after delay
+      setTimeout(() => {
+        onBack();
+      }, 3000);
     } catch (error) {
       console.error("Error in vote submission:", error);
       toast.error("Unexpected error occurred");
@@ -226,13 +260,15 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const isLoading = isSubmitting || isCreating || isConfirming;
 
   // Loading state
-  if (isLoading && !election) {
+  if (isLoading || isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mx-auto" />
           <p className="text-slate-600 dark:text-slate-300">
-            Loading election data...
+            {isInitializing
+              ? "Initializing voting session..."
+              : "Loading election data..."}
           </p>
         </div>
       </div>
