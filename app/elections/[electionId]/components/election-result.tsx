@@ -36,7 +36,6 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
   // Memoize the results calculation to avoid recalculation
   const resultsByCategory = useMemo(() => {
-    // Group candidates by category name and sort by votes
     const results = (election?.candidates ?? []).reduce(
       (acc, candidate) => {
         const category = candidate.category;
@@ -51,7 +50,11 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
     // Sort candidates by vote count within each category
     Object.keys(results).forEach((category) => {
-      results[category].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      results[category].sort((a, b) => {
+        const aVotes = Number((a.voteCount || 0n).toString());
+        const bVotes = Number((b.voteCount || 0n).toString());
+        return bVotes - aVotes;
+      });
     });
 
     return results;
@@ -59,12 +62,10 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
 
   // Calculate category total votes for percentage calculations
   const getCategoryTotalVotes = (category: string) => {
-    return (
-      resultsByCategory[category]?.reduce(
-        (sum, c) => sum + (c.voteCount || 0),
-        0,
-      ) || 0
-    );
+    return resultsByCategory[category]?.reduce((sum, c) => {
+      const votes = Number((c.voteCount || 0n).toString());
+      return sum + votes;
+    }, 0);
   };
 
   // Handle category change - this will control both results and chart
@@ -170,11 +171,13 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-blue-600">
-                    {(
-                      ((election?.totalVotes ?? 0) /
-                        (election?.totalVoters ?? 0)) *
-                      100
-                    ).toFixed(1)}
+                    {election?.totalVoters > 0
+                      ? (
+                          (Number((election?.totalVotes || 0n).toString()) /
+                            Number((election?.totalVoters || 0n).toString())) *
+                          100
+                        ).toFixed(1)
+                      : "0"}
                     %
                   </p>
                   <p className="text-sm text-gray-600">Turnout</p>

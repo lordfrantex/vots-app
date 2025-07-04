@@ -68,9 +68,12 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
           (candidate as any).outcome = getSingleCandidateOutcome(candidate);
         });
       } else {
-        candidatesByCategory[category].sort(
-          (a, b) => (b.voteFor || 0n) - (a.voteFor || 0n),
-        );
+        candidatesByCategory[category].sort((a, b) => {
+          // Convert BigInt to string for comparison
+          const aVotes = (a.voteFor || 0n).toString();
+          const bVotes = (b.voteFor || 0n).toString();
+          return bVotes.localeCompare(aVotes);
+        });
       }
     });
   }
