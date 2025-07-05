@@ -223,7 +223,7 @@ export default function CreateElectionPage() {
       return;
     }
 
-    console.log("=== FORM SUBMISSION START ===");
+    //console.log("=== FORM SUBMISSION START ===");
 
     try {
       setIsSubmitting(true);
@@ -231,21 +231,21 @@ export default function CreateElectionPage() {
       // Validate complete election
       const validation = validateCompleteElection();
       if (!validation.success || !validation.data) {
-        console.error("Validation errors:", validation.errors);
+        //console.error("Validation errors:", validation.errors);
         toast.error("Please complete all required fields before submitting.");
         return;
       }
 
-      console.log("Collected form data:", validation.data);
+      //console.log("Collected form data:", validation.data);
 
       // Convert to contract parameters
       const contractParams = convertToContractElectionParams(validation.data);
-      console.log("Contract parameters:", contractParams);
+      // console.log("Contract parameters:", contractParams);
 
       // Validate contract parameters
       const contractValidation = validateContractElectionParams(contractParams);
       if (!contractValidation.isValid) {
-        console.error("Contract validation failed:", contractValidation.errors);
+        //console.error("Contract validation failed:", contractValidation.errors);
         toast.error("Validation failed");
         return;
       }
@@ -258,24 +258,24 @@ export default function CreateElectionPage() {
         tempElectionId,
         validation.data,
       );
-      console.log("Saved off-chain data for election:", tempElectionId);
+      //console.log("Saved off-chain data for election:", tempElectionId);
 
       // Submit to blockchain using the hook
       const result = await createElection({
         electionParams: contractParams,
       });
 
-      console.log("Blockchain submission result:", result);
+      //console.log("Blockchain submission result:", result);
 
       if (!result.success) {
         toast.error("Failed to create election");
       }
     } catch (error) {
-      console.error("Error in form submission:", error);
+      //console.error("Error in form submission:", error);
       toast.error("Unexpected error");
     } finally {
       setIsSubmitting(false);
-      console.log("=== FORM SUBMISSION END ===");
+      //console.log("=== FORM SUBMISSION END ===");
     }
   }, [validateCompleteElection, createElection, isConnected, address]);
 

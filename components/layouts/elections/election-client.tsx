@@ -100,7 +100,7 @@ const ElectionClient: React.FC = () => {
     };
   }, [elections]);
 
-  console.log("Elections:", elections);
+  //console.log("Elections Client:", elections);
 
   return (
     <section className="max-w-7xl mx-auto pb-24">

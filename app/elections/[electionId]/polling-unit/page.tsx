@@ -48,7 +48,7 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
       console.log("Election has ended, clearing session");
       clearSession();
       // Redirect to election page
-      window.location.href = `/elections/${electionId}`;
+      window.location.href = `/elections`;
     }
   }, [electionDetails, electionId, clearSession]);
 

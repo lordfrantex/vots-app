@@ -51,6 +51,10 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
     {} as Record<string, ContractCandidateInfoDTO[]>,
   );
 
+  // Debug logging to check candidates data
+  console.log("Election candidates:", candidates);
+  console.log("Candidates by category:", candidatesByCategory);
+
   const isSingleCandidateCategory = (category: string) => {
     return candidatesByCategory[category]?.length === 1;
   };
@@ -92,6 +96,37 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
 
   return (
     <div className="mt-12">
+      {/* Election Status Banner */}
+      <div
+        className={`mb-6 p-4 rounded-lg text-center ${
+          election.status === "UPCOMING"
+            ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+            : election.status === "ACTIVE"
+              ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+              : "bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700"
+        }`}
+      >
+        <h2 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">
+          {election.name}
+        </h2>
+        <p
+          className={`text-sm ${
+            election.status === "UPCOMING"
+              ? "text-blue-700 dark:text-blue-300"
+              : election.status === "ACTIVE"
+                ? "text-green-700 dark:text-green-300"
+                : "text-gray-600 dark:text-gray-400"
+          }`}
+        >
+          {election.status === "UPCOMING" &&
+            "Election is scheduled to begin soon. Vote counts will be hidden until completion."}
+          {election.status === "ACTIVE" &&
+            "Election is currently ongoing. Vote counts are hidden until completion."}
+          {election.status === "COMPLETED" &&
+            "Election has ended. Final results are now displayed."}
+        </p>
+      </div>
+
       <Tabs value={activeCategory} onValueChange={setActiveCategory}>
         <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50">
           {categoryNames.map((category) => (

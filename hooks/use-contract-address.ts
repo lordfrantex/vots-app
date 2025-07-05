@@ -271,21 +271,21 @@ export const useContractElections = (preferredChainId?) => {
 
         return 0;
       };
-
-      console.log(`Election ${electionId} vote counts:`, {
-        electionInfo: electionInfo ? "loaded" : "missing",
-        votedVotersCountFromElectionInfo: electionInfo?.votedVotersCount,
-        accreditedVotersCountFromElectionInfo:
-          electionInfo?.accreditedVotersCount,
-        registeredVotersCountFromElectionInfo:
-          electionInfo?.registeredVotersCount,
-        votedVotersCountFromSummary: summary.votedVotersCount,
-        accreditedVotersCountFromSummary: summary.accreditedVotersCount,
-        registeredVotersCountFromSummary: summary.registeredVotersCount,
-        calculatedVotedCount: getVotedVotersCount(),
-        calculatedRegisteredCount: getAccreditedVotersCount(),
-        calculatedRegisteredCount: getRegisteredVotersCount(),
-      });
+      //
+      // console.log(`Election ${electionId} vote counts:`, {
+      //   electionInfo: electionInfo ? "loaded" : "missing",
+      //   votedVotersCountFromElectionInfo: electionInfo?.votedVotersCount,
+      //   accreditedVotersCountFromElectionInfo:
+      //     electionInfo?.accreditedVotersCount,
+      //   registeredVotersCountFromElectionInfo:
+      //     electionInfo?.registeredVotersCount,
+      //   votedVotersCountFromSummary: summary.votedVotersCount,
+      //   accreditedVotersCountFromSummary: summary.accreditedVotersCount,
+      //   registeredVotersCountFromSummary: summary.registeredVotersCount,
+      //   calculatedVotedCount: getVotedVotersCount(),
+      //   calculatedAccreditedCount: getAccreditedVotersCount(),
+      //   calculatedRegisteredCount: getRegisteredVotersCount(),
+      // });
 
       // Convert categories from blockchain data
       const categories: Category[] =
@@ -406,6 +406,7 @@ export const useContractElections = (preferredChainId?) => {
 // Hook for getting a single election with full details - UPDATED for new ABI
 // Updated useElectionDetails hook - Fixed to use votedVotersCount from electionInfo
 
+// Updated useElectionDetails hook - Fixed to include all details like useContractElections
 export const useElectionDetails = (
   electionId: string | null,
   preferredChainId?,
@@ -452,6 +453,18 @@ export const useElectionDetails = (
           staleTime: 0,
         },
       },
+      // ADDED: Missing getAllCandidates call
+      {
+        abi,
+        address: contractAddress,
+        functionName: "getAllCandidates",
+        args: [id],
+        chainId: targetChainId,
+        query: {
+          enabled: !!contractAddress && id > 0n,
+          staleTime: 0,
+        },
+      },
     ];
   }, [electionId, contractAddress]);
 
@@ -470,11 +483,16 @@ export const useElectionDetails = (
   const election = useMemo(() => {
     if (!contractData || !electionId) return null;
 
-    const [electionInfoResult, allVotersResult, electionStatsResult] =
-      contractData as Array<{
-        result?: unknown;
-        error?: Error;
-      }>;
+    // UPDATED: Now includes getAllCandidates result
+    const [
+      electionInfoResult,
+      allVotersResult,
+      electionStatsResult,
+      allCandidatesResult,
+    ] = contractData as Array<{
+      result?: unknown;
+      error?: Error;
+    }>;
 
     const electionInfo = electionInfoResult?.result as
       | ContractElectionInfo
@@ -485,11 +503,16 @@ export const useElectionDetails = (
     const electionStats = electionStatsResult?.result as
       | [bigint, bigint, bigint, bigint, bigint, bigint]
       | undefined;
+    // ADDED: Extract candidates from getAllCandidates result
+    const allCandidates = allCandidatesResult?.result as
+      | ContractElectionInfo[]
+      | undefined;
 
     if (!electionInfo) return null;
 
-    // FIXED: Helper functions to get vote counts
+    // FIXED: Complete helper functions to get all vote counts (same as useContractElections)
     const getVotedVotersCount = (): number => {
+      // First try from electionInfo (this is where it actually exists)
       if (
         electionInfo.votedVotersCount !== undefined &&
         electionInfo.votedVotersCount !== null
@@ -498,7 +521,7 @@ export const useElectionDetails = (
         if (!isNaN(count)) return count;
       }
 
-      // Fallback: count from voters array
+      // Final fallback: count from voters array
       if (allVotersData) {
         const votedCount = allVotersData.filter((voter) => {
           return voter.hasVoted === true;
@@ -521,14 +544,18 @@ export const useElectionDetails = (
       return 0;
     };
 
-    console.log(`Single election ${electionId} data:`, {
-      votersCount: allVotersData?.length || 0,
-      stats: electionStats ? "loaded" : "missing",
-      votedVotersCount: electionInfo.votedVotersCount,
-      registeredVotersCount: electionInfo.registeredVotersCount,
-      calculatedVotedCount: getVotedVotersCount(),
-      calculatedRegisteredCount: getRegisteredVotersCount(),
-    });
+    // ADDED: Missing accredited voters count function
+    const getAccreditedVotersCount = (): number => {
+      if (
+        electionInfo.accreditedVotersCount !== undefined &&
+        electionInfo.accreditedVotersCount !== null
+      ) {
+        const count = Number(electionInfo.accreditedVotersCount);
+        if (!isNaN(count)) return count;
+      }
+
+      return 0;
+    };
 
     // Convert all data from blockchain
     const categories: Category[] = electionInfo.electionCategories.map(
@@ -538,10 +565,15 @@ export const useElectionDetails = (
       }),
     );
 
-    const candidates: Candidate[] = electionInfo.candidatesList.map(
-      (candidate, idx) =>
+    // UPDATED: Use getAllCandidates result instead of candidatesList from electionInfo
+    const candidates: Candidate[] =
+      allCandidates?.map((candidate, idx) =>
         convertCandidateFromContractEnhanced(candidate, idx, electionId),
-    );
+      ) ||
+      // Fallback to candidatesList if getAllCandidates fails
+      electionInfo.candidatesList.map((candidate, idx) =>
+        convertCandidateFromContractEnhanced(candidate, idx, electionId),
+      );
 
     // Convert voters for POLLING OFFICERS (LIMITED INFO)
     const pollingOfficerVoters: PollingOfficerVoterView[] =
@@ -579,6 +611,7 @@ export const useElectionDetails = (
       }),
     );
 
+    // UPDATED: Calculate total votes from candidates (same as useContractElections)
     const totalVotes = candidates.reduce(
       (sum, candidate) => sum + (candidate.voteCount || 0),
       0,
@@ -595,9 +628,10 @@ export const useElectionDetails = (
       electionInfo.endTimestamp,
     );
 
-    // FIXED: Use the proper vote counts
+    // FIXED: Use all the proper vote counts (same as useContractElections)
     const totalVoters = getRegisteredVotersCount();
     const votedVotersCount = getVotedVotersCount();
+    const accreditedVotersCount = getAccreditedVotersCount(); // ADDED: This was missing
 
     const election: Election = {
       id: electionId,
@@ -608,6 +642,7 @@ export const useElectionDetails = (
       categories,
       totalVoters, // From registeredVotersCount
       totalVotes: votedVotersCount, // FIXED: Use votedVotersCount from electionInfo
+      accreditedVoters: accreditedVotersCount, // ADDED: This was missing
       candidates,
       voters,
       pollingOfficers,
