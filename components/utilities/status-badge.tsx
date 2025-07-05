@@ -12,7 +12,7 @@ export const getStatusBadge = (status: string) => {
     case "UPCOMING":
       return `${baseClasses} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-800/10`;
     case "COMPLETED":
-      return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border border-gray-800/10`;
+      return `${baseClasses} bg-violet-100 text-violet-800 dark:bg-violet-800/30 dark:text-violet-300 border border-violet-800/10`;
     default:
       return `${baseClasses} bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 border border-gray-800/10`;
   }

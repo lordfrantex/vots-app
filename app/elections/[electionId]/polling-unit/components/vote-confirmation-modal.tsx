@@ -112,7 +112,7 @@ const VoteConfirmationModal = ({
                       {selection.voteType.toUpperCase()}
                     </Badge>
                   ) : (
-                    <Badge className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-500/50">
+                    <Badge className="bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-300 dark:border-green-500/50">
                       <CheckCircle className="h-3 w-3 mr-1" />
                       Selected
                     </Badge>
@@ -123,9 +123,9 @@ const VoteConfirmationModal = ({
           </div>
 
           {/* Warning */}
-          <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50">
-            <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-            <AlertDescription className="text-red-700 dark:text-red-300">
+          <Alert className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-700 dark:text-amber-300">
               <strong>Final Warning:</strong> Once you submit your vote, it
               cannot be changed or undone.
             </AlertDescription>

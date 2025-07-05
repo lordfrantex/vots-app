@@ -16,11 +16,23 @@ import {
 import type { ContractElectionParams } from "@/utils/contract-helpers";
 import type { Address } from "viem";
 import { Voter } from "@/types/voter";
+import { usePollingUnitSession } from "./use-polling-unit-session";
+import { sepolia } from "wagmi/chains";
 
 // Types for write operations - UPDATED for new ABI
 export interface AccreditVoterParams {
   voterMatricNo: string;
   electionTokenId: bigint;
+}
+
+interface ValidatePollingUnitParams {
+  electionTokenId: string;
+}
+
+interface ValidatePollingUnitResult {
+  success: boolean;
+  hash?: string;
+  message: string;
 }
 
 export interface ValidateVoterForVotingParams {
@@ -53,7 +65,7 @@ interface ElectionVoter {
 }
 
 // Helper function to get contract address for current chain
-function getContractAddress(chainId: number): Address | null {
+export function getContractAddress(chainId: number): Address | null {
   const address = electionAddress[chainId as keyof typeof electionAddress];
   return address || null;
 }
@@ -640,206 +652,157 @@ export function useValidatePollingOfficer() {
 }
 // Hook for validating polling units - UPDATED for chain-aware addresses
 export function useValidatePollingUnit() {
-  const { address } = useAccount();
   const chainId = useChainId();
+  const { session } = usePollingUnitSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    writeContract,
-    data: hash,
-    isPending,
-    error: writeError,
-  } = useWriteContract();
+  const validatePollingUnit = async (
+    params: ValidatePollingUnitParams,
+  ): Promise<ValidatePollingUnitResult> => {
+    if (!session.isValid || !session.walletClient) {
+      const errorMsg = "No valid polling unit session";
+      setError(errorMsg);
+      return {
+        success: false,
+        message: errorMsg,
+      };
+    }
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+    setIsLoading(true);
+    setError(null);
 
-  const validatePollingUnit = useCallback(
-    async (
-      electionTokenId: bigint,
-    ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== VALIDATE POLLING UNIT START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Election Token ID:", electionTokenId);
+    try {
+      console.log("Validating polling unit with params:", params);
 
-      if (!address) {
-        return { success: false, message: "Please connect your wallet first" };
-      }
+      // Ensure electionTokenId is properly converted to BigInt
+      const electionTokenIdBigInt = BigInt(params.electionTokenId);
 
-      // Validate chain support
-      const chainValidation = validateChainSupport(chainId);
-      if (!chainValidation.isSupported) {
-        return { success: false, message: chainValidation.message! };
-      }
+      // Submit the validation transaction
+      const hash = await session.walletClient.writeContract({
+        address: getContractAddress(chainId),
+        abi,
+        functionName: "validateAddressAsPollingUnit",
+        args: [electionTokenIdBigInt],
+        account: session.walletClient.account, // Add this line
+      });
 
-      // Get contract address for current chain
-      const contractAddress = getContractAddress(chainId);
-      if (!contractAddress) {
-        return {
-          success: false,
-          message: "Contract not deployed on this network",
-        };
-      }
+      console.log("Validation transaction submitted with hash:", hash);
 
-      setIsLoading(true);
-      setError(null);
+      // Wait for transaction confirmation
+      const receipt = await session.walletClient.waitForTransactionReceipt({
+        hash,
+        timeout: 60000, // 1 minute timeout
+      });
 
-      try {
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: validateAddressAsPollingUnit");
-        console.log("- Args:", [electionTokenId]);
+      console.log("Validation transaction confirmed:", receipt);
 
-        writeContract({
-          abi,
-          address: contractAddress,
-          functionName: "validateAddressAsPollingUnit",
-          args: [electionTokenId],
-        });
-
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
-
+      if (receipt.status === "success") {
         return {
           success: true,
-          message:
-            "Polling unit validation transaction submitted! Please confirm in MetaMask and wait for blockchain confirmation.",
-          hash: hash,
+          hash,
+          message: "Polling unit validated successfully",
         };
-      } catch (err) {
-        console.error("=== VALIDATE POLLING UNIT ERROR ===");
-        console.error("Error details:", err);
-        console.error("Write error:", writeError);
-
-        let errorMessage = "Failed to validate polling unit";
-
-        if (err instanceof Error) {
-          if (err.message.includes("User rejected")) {
-            errorMessage = "Transaction was rejected by user";
-          } else if (err.message.includes("insufficient funds")) {
-            errorMessage = "Insufficient funds for gas fees";
-          } else if (err.message.includes("execution reverted")) {
-            errorMessage = "Transaction failed: " + err.message;
-          } else if (err.message.includes("invalid address")) {
-            errorMessage =
-              "Invalid contract address. Please check your configuration.";
-          } else {
-            errorMessage = err.message;
-          }
-        }
-
-        setError(errorMessage);
-        return { success: false, message: errorMessage };
-      } finally {
-        setIsLoading(false);
-        console.log("=== VALIDATE POLLING UNIT END ===");
+      } else {
+        throw new Error("Validation transaction failed");
       }
-    },
-    [address, chainId, writeContract, hash, writeError],
-  );
+    } catch (err: any) {
+      console.error("Polling unit validation error:", err);
+      const errorMessage = err.message || "Failed to validate polling unit";
+      setError(errorMessage);
+
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     validatePollingUnit,
-    isLoading: isLoading || isPending || isConfirming,
-    isSuccess,
-    error: error || writeError?.message,
-    hash,
-    isPending,
-    isConfirming,
-    chainId,
-    contractAddress: getContractAddress(chainId),
-    isChainSupported: validateChainSupport(chainId).isSupported,
+    isLoading,
+    error,
   };
 }
-
 // Hook for voting - UPDATED for chain-aware addresses
 export function useVoteCandidates() {
   const { address } = useAccount();
   const chainId = useChainId();
+  const { session } = usePollingUnitSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  const voteCandidates = async (
+    params: VoteCandidatesParams,
+  ): Promise<VoteCandidatesResult> => {
+    if (!session.isValid || !session.walletClient) {
+      const errorMsg =
+        "No valid polling unit session. Please validate your polling unit first.";
+      setError(errorMsg);
+      return {
+        success: false,
+        message: errorMsg,
+      };
+    }
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+    setIsLoading(true);
+    setError(null);
 
-  const voteCandidates = useCallback(
-    async (
-      params: VoteCandidatesParams,
-    ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      if (!address) {
-        return { success: false, message: "Please connect your wallet" };
-      }
+    try {
+      console.log("Submitting vote with params:", params);
 
-      // Validate chain support
-      const chainValidation = validateChainSupport(chainId);
-      if (!chainValidation.isSupported) {
-        return { success: false, message: chainValidation.message! };
-      }
+      // Submit the transaction
+      const hash = await session.walletClient.writeContract({
+        address: getContractAddress(chainId),
+        abi,
+        functionName: "voteCandidates",
+        args: [
+          params.voterMatricNo,
+          params.voterName,
+          params.candidatesList,
+          params.electionTokenId,
+        ],
+        account: session.walletClient.account, // Add this line
+      });
 
-      // Get contract address for current chain
-      const contractAddress = getContractAddress(chainId);
-      if (!contractAddress) {
-        return {
-          success: false,
-          message: "Contract not deployed on this network",
-        };
-      }
+      console.log("Transaction submitted with hash:", hash);
 
-      setIsLoading(true);
-      setError(null);
+      // Wait for transaction confirmation
+      const receipt = await session.walletClient.waitForTransactionReceipt({
+        hash,
+        timeout: 60000, // 1 minute timeout
+      });
 
-      try {
-        console.log("Voting for candidates:", params);
-        console.log("Contract address:", contractAddress);
-        console.log("Chain ID:", chainId);
+      console.log("Transaction confirmed:", receipt);
 
-        writeContract({
-          abi,
-          address: contractAddress,
-          functionName: "voteCandidates",
-          args: [
-            params.voterMatricNo,
-            params.voterName,
-            params.candidatesList,
-            params.electionTokenId,
-          ],
-        });
-
+      if (receipt.status === "success") {
         return {
           success: true,
-          message: "Vote submitted. Please wait for confirmation...",
-          hash: hash,
+          hash,
+          message: "Vote submitted successfully",
         };
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to vote";
-        setError(errorMessage);
-        console.error("Error voting:", err);
-        return { success: false, message: errorMessage };
-      } finally {
-        setIsLoading(false);
+      } else {
+        throw new Error("Transaction failed");
       }
-    },
-    [address, chainId, writeContract, hash],
-  );
+    } catch (err: any) {
+      console.error("Vote submission error:", err);
+      const errorMessage = err.message || "Failed to submit vote";
+      setError(errorMessage);
+
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     voteCandidates,
-    isLoading: isLoading || isPending || isConfirming,
-    isSuccess,
+    isLoading,
     error,
-    hash,
-    chainId,
-    isConfirming,
-    contractAddress: getContractAddress(chainId),
-    isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }

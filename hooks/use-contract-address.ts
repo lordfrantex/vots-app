@@ -452,17 +452,6 @@ export const useElectionDetails = (
           staleTime: 0,
         },
       },
-      {
-        abi,
-        address: contractAddress,
-        functionName: "getAllCandidates",
-        args: [id],
-        chainId: targetChainId,
-        query: {
-          enabled: !!contractAddress && id > 0n,
-          staleTime: 0,
-        },
-      },
     ];
   }, [electionId, contractAddress]);
 
@@ -481,15 +470,11 @@ export const useElectionDetails = (
   const election = useMemo(() => {
     if (!contractData || !electionId) return null;
 
-    const [
-      electionInfoResult,
-      allVotersResult,
-      electionStatsResult,
-      allCandidatesResult,
-    ] = contractData as Array<{
-      result?: unknown;
-      error?: Error;
-    }>;
+    const [electionInfoResult, allVotersResult, electionStatsResult] =
+      contractData as Array<{
+        result?: unknown;
+        error?: Error;
+      }>;
 
     const electionInfo = electionInfoResult?.result as
       | ContractElectionInfo
@@ -536,25 +521,12 @@ export const useElectionDetails = (
       return 0;
     };
 
-    const getAccreditedVotersCount = (): number => {
-      if (
-        electionInfo.accreditedVotersCount !== undefined &&
-        electionInfo.accreditedVotersCount !== null
-      ) {
-        const count = Number(electionInfo.accreditedVotersCount);
-        if (!isNaN(count)) return count;
-      }
-
-      return 0;
-    };
-
     console.log(`Single election ${electionId} data:`, {
       votersCount: allVotersData?.length || 0,
       stats: electionStats ? "loaded" : "missing",
       votedVotersCount: electionInfo.votedVotersCount,
       registeredVotersCount: electionInfo.registeredVotersCount,
       calculatedVotedCount: getVotedVotersCount(),
-      calculatedAccreditedCount: getAccreditedVotersCount(),
       calculatedRegisteredCount: getRegisteredVotersCount(),
     });
 
@@ -565,14 +537,11 @@ export const useElectionDetails = (
         name: categoryName,
       }),
     );
-    const allCandidates = allCandidatesResult?.result as
-      | ContractCandidateInfoDTO[]
-      | undefined;
 
-    const candidates: Candidate[] =
-      allCandidates?.map((candidate, idx) =>
+    const candidates: Candidate[] = electionInfo.candidatesList.map(
+      (candidate, idx) =>
         convertCandidateFromContractEnhanced(candidate, idx, electionId),
-      ) || [];
+    );
 
     // Convert voters for POLLING OFFICERS (LIMITED INFO)
     const pollingOfficerVoters: PollingOfficerVoterView[] =
@@ -629,7 +598,6 @@ export const useElectionDetails = (
     // FIXED: Use the proper vote counts
     const totalVoters = getRegisteredVotersCount();
     const votedVotersCount = getVotedVotersCount();
-    const accreditedVotersCount = getAccreditedVotersCount();
 
     const election: Election = {
       id: electionId,
@@ -640,7 +608,6 @@ export const useElectionDetails = (
       categories,
       totalVoters, // From registeredVotersCount
       totalVotes: votedVotersCount, // FIXED: Use votedVotersCount from electionInfo
-      accreditedVoters: accreditedVotersCount,
       candidates,
       voters,
       pollingOfficers,

@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import { useAccount } from "wagmi";
 
 import VoterAuthenticationModal from "./components/voter-authentication-modal";
 import VotingPage from "./components/voting-page";
-import { PollingUnitWalletModal } from "@/app/elections/[electionId]/polling-unit/components/polling-unit-validation";
+import { usePollingUnitSession } from "@/hooks/use-polling-unit-session";
+import { PollingUnitValidationModal } from "@/app/elections/[electionId]/polling-unit/components/polling-unit-validation";
+import { useElectionDetails } from "@/hooks/use-contract-address";
 
 interface AuthenticatedVoter {
   name: string;
@@ -36,38 +38,71 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
   const [pollingUnit, setPollingUnit] = useState<PollingUnit | null>(null);
   const [authenticatedVoter, setAuthenticatedVoter] =
     useState<AuthenticatedVoter | null>(null);
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [isValidPollingUnit, setIsValidPollingUnit] = useState(false);
-  const [showConnectionModal, setShowConnectionModal] = useState(true);
-  const [connectedWallet, setConnectedWallet] = useState("");
+  const [showPollingUnitModal, setShowPollingUnitModal] = useState(true);
 
-  const handleWalletConnection = async (
-    walletAddress: string,
-    isValid: boolean,
-  ) => {
-    try {
-      if (isValid) {
-        setIsWalletConnected(true);
-        setIsValidPollingUnit(true);
-        setConnectedWallet(walletAddress);
-        setShowConnectionModal(false);
+  const { election: electionDetails } = useElectionDetails(electionId);
+  const { session, isSessionValid, clearSession } = usePollingUnitSession();
 
-        // Set polling unit info based on connected wallet
+  useEffect(() => {
+    if (electionDetails?.status === "COMPLETED") {
+      console.log("Election has ended, clearing session");
+      clearSession();
+      // Redirect to election page
+      window.location.href = `/elections/${electionId}`;
+    }
+  }, [electionDetails, electionId, clearSession]);
+
+  // Check session validity on mount and session changes
+  useEffect(() => {
+    if (isSessionValid()) {
+      console.log("Valid session found, proceeding to authentication");
+      const walletAddress = session.walletClient.account.address;
+      setPollingUnit({
+        unitId: `unit-${walletAddress.slice(-6)}`,
+        unitName: `Polling Unit ${walletAddress.slice(-6)}`,
+        address: walletAddress,
+      });
+      setShowPollingUnitModal(false);
+      setCurrentStep("authentication");
+
+      // Set polling unit info based on session
+      if (session.walletClient?.account) {
+        const walletAddress = session.walletClient.account.address;
         setPollingUnit({
           unitId: `unit-${walletAddress.slice(-6)}`,
           unitName: `Polling Unit ${walletAddress.slice(-6)}`,
           address: walletAddress,
         });
-
-        setCurrentStep("authentication");
-      } else {
-        throw new Error(
-          "Wallet not authorized as polling unit for this election",
-        );
       }
-    } catch (error) {
-      console.error("Wallet validation failed:", error);
-      throw error;
+    } else {
+      console.log("No valid session, showing validation modal");
+      setShowPollingUnitModal(true);
+      setCurrentStep("validation");
+    }
+  }, [session.isValid, session.walletClient]);
+
+  const handlePollingUnitValidationClose = () => {
+    // Always close the modal, but check session validity
+    setShowPollingUnitModal(false);
+
+    // Check if session is now valid
+    if (isSessionValid()) {
+      setCurrentStep("authentication");
+
+      // Set polling unit info
+      if (session.walletClient?.account) {
+        const walletAddress = session.walletClient.account.address;
+        setPollingUnit({
+          unitId: `unit-${walletAddress.slice(-6)}`,
+          unitName: `Polling Unit ${walletAddress.slice(-6)}`,
+          address: walletAddress,
+        });
+      }
+    } else {
+      // If session is not valid, keep showing validation modal
+      setTimeout(() => {
+        setShowPollingUnitModal(true);
+      }, 500);
     }
   };
 
@@ -85,21 +120,18 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
     setCurrentStep("validation");
     setPollingUnit(null);
     setAuthenticatedVoter(null);
-    setIsWalletConnected(false);
-    setIsValidPollingUnit(false);
-    setShowConnectionModal(true);
-    setConnectedWallet("");
+    setShowPollingUnitModal(true);
   };
 
-  // Show wallet connection modal if not connected or not valid
-  if (showConnectionModal || !isWalletConnected || !isValidPollingUnit) {
+  // Show validation modal if session is not valid
+  if (!isSessionValid() || showPollingUnitModal) {
     return (
       <div className="min-h-screen">
-        <PollingUnitWalletModal
-          isOpen={showConnectionModal}
-          onConnect={handleWalletConnection}
+        <PollingUnitValidationModal
+          isOpen={showPollingUnitModal}
+          onClose={handlePollingUnitValidationClose}
           electionId={electionId}
-          electionName="Student Election" // You can get this from election data
+          electionName={"Student Election"}
         />
       </div>
     );

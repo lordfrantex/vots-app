@@ -22,9 +22,9 @@ const ElectionCard: React.FC<ElectionCardProps> = ({ election }) => {
       case "UPCOMING":
         return `${baseClasses} bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30`;
       case "COMPLETED":
-        return `${baseClasses} bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/30`;
+        return `${baseClasses} bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/30`;
       default:
-        return `${baseClasses} bg-gray-50 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700`;
+        return `${baseClasses} bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-800 dark:text-green-300 dark:hover:bg-green-700`;
     }
   };
 

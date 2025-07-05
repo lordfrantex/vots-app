@@ -23,6 +23,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useValidateVoterForVoting } from "@/hooks/use-election-write-operations";
+import { useSessionValidateVoter } from "@/hooks/use-session-validate-voter";
 
 interface VoterAuthenticationModalProps {
   electionId: string;
@@ -66,16 +67,17 @@ const VoterAuthenticationModal = ({
     return BigInt(electionId);
   }, [electionId]);
 
-  // Use the voter validation hook
+  // Use the session-based hook
   const {
     validateVoterForVoting,
-    isLoading: isValidating,
+    isLoading: isSessionValidating,
     isSuccess: isValidationSuccess,
     error: contractError,
     hash: validationHash,
-    isPending: isContractPending,
-    isConfirming,
-  } = useValidateVoterForVoting();
+    isConfirming: isSessionConfirming,
+  } = useSessionValidateVoter();
+
+  const isProcessing = isSessionValidating || isSessionConfirming;
 
   // Handle validation success
   useEffect(() => {
@@ -173,8 +175,6 @@ const VoterAuthenticationModal = ({
       });
     }
   };
-
-  const isProcessing = isValidating || isContractPending || isConfirming;
 
   // Reset authentication result when form is cleared
   useEffect(() => {
@@ -276,13 +276,13 @@ const VoterAuthenticationModal = ({
             {validationHash && (
               <div className="p-4 bg-blue-500/20 dark:bg-blue-900/20 border border-blue-700/50 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  {isConfirming ? (
+                  {isProcessing ? (
                     <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
                   ) : (
                     <CheckCircle className="h-4 w-4 text-blue-400" />
                   )}
                   <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                    {isConfirming
+                    {isProcessing
                       ? "Confirming Authentication..."
                       : "Authentication Transaction Submitted"}
                   </span>
@@ -322,12 +322,7 @@ const VoterAuthenticationModal = ({
                 {isProcessing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isContractPending && "Preparing..."}
-                    {isConfirming && "Confirming..."}
-                    {isValidating &&
-                      !isContractPending &&
-                      !isConfirming &&
-                      "Authenticating..."}
+                    {validationHash ? "Confirming..." : "Preparing..."}
                   </>
                 ) : (
                   <>

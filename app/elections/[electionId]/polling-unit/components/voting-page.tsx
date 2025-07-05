@@ -25,7 +25,7 @@ import VoteConfirmationModal from "./vote-confirmation-modal";
 import type { Candidate } from "@/types/candidate";
 import Image from "next/image";
 import toast from "react-hot-toast";
-import { usePreAuthVoting } from "@/hooks/use-pre-auth-voting";
+import { useSessionVoteCandidates } from "@/hooks/use-session-vote-candidates";
 
 interface VotingPageProps {
   electionId: string;
@@ -57,12 +57,11 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const [votingEnded, setVotingEnded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
 
-  const { initializeSession, executeVote, isSessionActive } =
-    usePreAuthVoting();
   // Use the consolidated hook for election details
   const { election, error } = useElectionDetails(electionId);
+  // Near the top of the VotingPage component
+  console.log("Election data:", election);
 
   // Voting hook - get the transaction states from the hook
   const {
@@ -72,22 +71,23 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     error: votingError,
     hash,
     isConfirming,
-  } = useVoteCandidates();
+  } = useSessionVoteCandidates();
 
   // Group candidates by category
   const candidatesByCategory = useMemo(() => {
     if (!election?.candidates) return {};
 
-    const grouped: { [category: string]: Candidate[] } = {};
-
-    election.candidates.forEach((candidate: Candidate) => {
-      if (!grouped[candidate.category]) {
-        grouped[candidate.category] = [];
-      }
-      grouped[candidate.category].push(candidate);
-    });
-
-    return grouped;
+    return election.candidates.reduce(
+      (acc, candidate) => {
+        const category = candidate.category;
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(candidate);
+        return acc;
+      },
+      {} as Record<string, Candidate[]>,
+    );
   }, [election?.candidates]);
 
   // Calculate progress
@@ -97,26 +97,6 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     categories.length > 0
       ? (selectedCategories.length / categories.length) * 100
       : 0;
-
-  useEffect(() => {
-    const setupVotingSession = async () => {
-      setIsInitializing(true);
-      try {
-        if (!isSessionActive) {
-          const success = await initializeSession(30);
-          if (!success) {
-            toast.error(
-              "Failed to initialize voting session. Please try again.",
-            );
-          }
-        }
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    setupVotingSession();
-  }, [initializeSession, isSessionActive]);
 
   // Handle success state - similar to create-election page
   useEffect(() => {
@@ -225,8 +205,8 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
       console.log("Vote selections:", candidatesList);
 
-      // Execute pre-authorized vote
-      const result = await executeVote({
+      // Submit to blockchain using the hook
+      const result = await voteCandidates({
         voterMatricNo: voter.matricNumber,
         voterName: voter.name,
         candidatesList,
@@ -237,17 +217,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
       if (!result.success) {
         toast.error("Failed to submit vote");
-        return;
       }
-
-      // Set success state
-      setIsConfirmed(true);
-      toast.success("Vote submitted successfully!");
-
-      // Redirect after delay
-      setTimeout(() => {
-        onBack();
-      }, 3000);
     } catch (error) {
       console.error("Error in vote submission:", error);
       toast.error("Unexpected error occurred");
@@ -260,15 +230,13 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const isLoading = isSubmitting || isCreating || isConfirming;
 
   // Loading state
-  if (isLoading || isInitializing) {
+  if (isLoading && !election) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mx-auto" />
           <p className="text-slate-600 dark:text-slate-300">
-            {isInitializing
-              ? "Initializing voting session..."
-              : "Loading election data..."}
+            Loading election data...
           </p>
         </div>
       </div>
@@ -483,126 +451,130 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
                   <CardContent>
                     <div className="grid grid-cols-1 gap-4">
-                      {categoryCandidate.map((candidate) => (
-                        <div
-                          key={candidate.id}
-                          className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                            selectedCandidate?.candidateMatricNo ===
-                            candidate.matricNo
-                              ? "border-blue-300 dark:border-blue-500 bg-blue-50 dark:bg-blue-500/10"
-                              : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 hover:border-slate-300 dark:hover:border-slate-500"
-                          }`}
-                        >
-                          <div className="flex items-center space-x-4">
-                            <div className="relative">
-                              <Image
-                                src={
-                                  candidate.photo ||
-                                  "/placeholder.svg?height=48&width=48"
-                                }
-                                alt={candidate.name}
-                                fill
-                                className="w-12 h-12 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
-                              />
-                            </div>
-
-                            <div className="flex-1">
-                              <h4 className="font-medium text-slate-900 dark:text-white">
-                                {candidate.name}
-                              </h4>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Candidate ID: {candidate.matricNo}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              {isSingleCandidate ? (
-                                // For/Against buttons for single candidate
-                                <>
-                                  <Button
-                                    onClick={() =>
-                                      handleSingleCandidateVote(
-                                        category,
-                                        candidate,
-                                        "for",
-                                      )
-                                    }
-                                    variant={
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "for"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    size="sm"
-                                    disabled={isVotingEnded}
-                                    className={`${
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "for"
-                                        ? "bg-green-600 hover:bg-green-700 text-white"
-                                        : "border-green-300 dark:border-green-500/50 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10"
-                                    }`}
-                                  >
-                                    <ThumbsUp className="h-4 w-4 mr-1" />
-                                    FOR
-                                  </Button>
-                                  <Button
-                                    onClick={() =>
-                                      handleSingleCandidateVote(
-                                        category,
-                                        candidate,
-                                        "against",
-                                      )
-                                    }
-                                    variant={
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "against"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    size="sm"
-                                    disabled={isVotingEnded}
-                                    className={`${
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "against"
-                                        ? "bg-red-600 hover:bg-red-700 text-white"
-                                        : "border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
-                                    }`}
-                                  >
-                                    <ThumbsDown className="h-4 w-4 mr-1" />
-                                    AGAINST
-                                  </Button>
-                                </>
-                              ) : (
-                                // Radio button for multiple candidates
-                                <button
-                                  onClick={() =>
-                                    !isVotingEnded &&
-                                    handleCandidateSelect(category, candidate)
+                      <div className="grid grid-cols-1 gap-4">
+                        {categoryCandidate.map((candidate) => (
+                          <div
+                            key={candidate.id}
+                            className={`p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
+                              selectedCandidate?.candidateMatricNo ===
+                              candidate.matricNo
+                                ? "border-blue-300 dark:border-blue-500 bg-blue-50 dark:bg-blue-500/10"
+                                : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 hover:border-slate-300 dark:hover:border-slate-500"
+                            } ${isVotingEnded ? "opacity-50 cursor-not-allowed" : ""}`}
+                            onClick={() => {
+                              if (!isVotingEnded && !isSingleCandidate) {
+                                handleCandidateSelect(category, candidate);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className="relative">
+                                <Image
+                                  src={
+                                    candidate.photo ||
+                                    "/placeholder.svg?height=48&width=48"
                                   }
-                                  disabled={isVotingEnded}
-                                  className={`w-5 h-5 rounded-full border-2 cursor-pointer transition-all ${
-                                    selectedCandidate?.candidateMatricNo ===
-                                    candidate.matricNo
-                                      ? "border-blue-500 bg-blue-500"
-                                      : "border-slate-400 dark:border-slate-500 hover:border-slate-500 dark:hover:border-slate-400"
-                                  } ${isVotingEnded ? "opacity-50 cursor-not-allowed" : ""}`}
-                                >
-                                  {selectedCandidate?.candidateMatricNo ===
-                                    candidate.matricNo && (
-                                    <div className="w-full h-full rounded-full bg-blue-500 flex items-center justify-center">
-                                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                                    </div>
-                                  )}
-                                </button>
-                              )}
+                                  alt={candidate.name}
+                                  fill
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
+                                />
+                              </div>
+
+                              <div className="flex-1">
+                                <h4 className="font-medium text-slate-900 dark:text-white">
+                                  {candidate.name}
+                                </h4>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  Candidate ID: {candidate.matricNo}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                                {isSingleCandidate ? (
+                                  // For/Against buttons for single candidate
+                                  <>
+                                    <Button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSingleCandidateVote(
+                                          category,
+                                          candidate,
+                                          "for",
+                                        );
+                                      }}
+                                      variant={
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType === "for"
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      disabled={isVotingEnded}
+                                      className={`${
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType === "for"
+                                          ? "bg-green-600 hover:bg-green-700 text-white"
+                                          : "border-green-300 dark:border-green-500/50 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                      }`}
+                                    >
+                                      <ThumbsUp className="h-4 w-4 mr-1" />
+                                      FOR
+                                    </Button>
+                                    <Button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSingleCandidateVote(
+                                          category,
+                                          candidate,
+                                          "against",
+                                        );
+                                      }}
+                                      variant={
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType ===
+                                          "against"
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      disabled={isVotingEnded}
+                                      className={`${
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType ===
+                                          "against"
+                                          ? "bg-red-600 hover:bg-red-700 text-white"
+                                          : "border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
+                                      }`}
+                                    >
+                                      <ThumbsDown className="h-4 w-4 mr-1" />
+                                      AGAINST
+                                    </Button>
+                                  </>
+                                ) : (
+                                  // Checkmark for multiple candidates
+                                  <div
+                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                      selectedCandidate?.candidateMatricNo ===
+                                      candidate.matricNo
+                                        ? "border-blue-500 bg-blue-500"
+                                        : "border-slate-400 dark:border-slate-500"
+                                    }`}
+                                  >
+                                    {selectedCandidate?.candidateMatricNo ===
+                                      candidate.matricNo && (
+                                      <CheckCircle className="w-3 h-3 text-white" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -669,7 +641,8 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                 <Alert className="mt-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50">
                   <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
                   <AlertDescription className="text-red-700 dark:text-red-300">
-                    <strong>Error:</strong> {votingError}
+                    <strong>Error:</strong> Vote could not be submitted. Please
+                    try again.
                   </AlertDescription>
                 </Alert>
               )}
