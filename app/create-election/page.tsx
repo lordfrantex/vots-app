@@ -30,7 +30,6 @@ import { ProgressHeader } from "@/components/layouts/create-election/progress-he
 import {
   convertToContractElectionParams,
   validateContractElectionParams,
-  OffChainDataService,
 } from "@/utils/contract-helpers";
 import type { Election } from "@/types/election";
 
@@ -193,7 +192,7 @@ export default function CreateElectionPage() {
           id: voter.id,
           name: voter.name,
           matricNumber: voter.matricNumber,
-          email: voter.email,
+          level: voter.level,
           department: voter.department,
           isAccredited: false,
           hasVoted: false,
@@ -253,11 +252,6 @@ export default function CreateElectionPage() {
       // Generate temporary election ID for off-chain data storage
       const tempElectionId = `temp-${Date.now()}`;
 
-      // Save off-chain data before blockchain transaction
-      OffChainDataService.saveElectionCreationData(
-        tempElectionId,
-        validation.data,
-      );
       //console.log("Saved off-chain data for election:", tempElectionId);
 
       // Submit to blockchain using the hook

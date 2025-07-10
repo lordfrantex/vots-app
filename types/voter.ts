@@ -2,8 +2,8 @@ export interface Voter {
   id: string;
   name: string;
   matricNumber: string; // For polling officers, this will be masked like "CSC/25/****"
-  email?: string;
-  department?: string;
+  level: string; // e.g. "Undergraduate", "Postgraduate"
+  department?: string; // e.g. "Computer Science"
   isAccredited?: boolean;
   hasVoted?: boolean;
   phoneNumber?: string;

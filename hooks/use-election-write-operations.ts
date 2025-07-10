@@ -91,95 +91,6 @@ function validateChainSupport(chainId: number): {
 }
 
 // Custom hook for reading voter data efficiently
-function useVoterData(electionTokenId: bigint, chainId: number) {
-  const contractAddress = getContractAddress(chainId);
-
-  // Read all voters
-  const { data: allVoters, refetch: refetchAllVoters } = useReadContract({
-    abi,
-    address: contractAddress,
-    functionName: "getAllVoters",
-    args: [electionTokenId],
-    query: {
-      enabled: !!contractAddress && electionTokenId > 0n,
-      staleTime: 0,
-    },
-  });
-
-  // Read accredited voters
-  const { data: accreditedVoters, refetch: refetchAccreditedVoters } =
-    useReadContract({
-      abi,
-      address: contractAddress,
-      functionName: "getAllAccreditedVoters",
-      args: [electionTokenId],
-      query: {
-        enabled: !!contractAddress && electionTokenId > 0n,
-        staleTime: 0,
-      },
-    });
-
-  // Read voted voters
-  const { data: votedVoters, refetch: refetchVotedVoters } = useReadContract({
-    abi,
-    address: contractAddress,
-    functionName: "getAllVotedVoters",
-    args: [electionTokenId],
-    query: {
-      enabled: !!contractAddress && electionTokenId > 0n,
-      staleTime: 0,
-    },
-  });
-
-  return {
-    allVoters: allVoters as ElectionVoter[] | undefined,
-    accreditedVoters: accreditedVoters as ElectionVoter[] | undefined,
-    votedVoters: votedVoters as ElectionVoter[] | undefined,
-    refetchAll: () => {
-      refetchAllVoters();
-      refetchAccreditedVoters();
-      refetchVotedVoters();
-    },
-  };
-}
-
-function checkVoterStatus(
-  voterMatricNo: string,
-  allVoters?: Voter[], // Change from ElectionVoter[] to Voter[]
-  accreditedVoters?: Voter[], // Change from ElectionVoter[] to Voter[]
-  votedVoters?: Voter[], // Change from ElectionVoter[] to Voter[]
-) {
-  // Check if voter is registered by matric number
-  const isRegistered =
-    allVoters?.some(
-      // CORRECTED: Compare matricNo with matricNo
-      (voter) =>
-        voter.matricNumber.toLowerCase() === voterMatricNo.toLowerCase(),
-    ) ?? false;
-
-  // Check if voter is accredited by matric number
-  const isAccredited =
-    accreditedVoters?.some(
-      // CORRECTED: Compare matricNo with matricNo
-      (voter) =>
-        voter.matricNumber.toLowerCase() === voterMatricNo.toLowerCase(),
-    ) ?? false;
-
-  // Check if voter has voted by matric number
-  const hasVoted =
-    votedVoters?.some(
-      // CORRECTED: Compare matricNo with matricNo
-      (voter) =>
-        voter.matricNumber.toLowerCase() === voterMatricNo.toLowerCase(),
-    ) ?? false;
-
-  return {
-    isRegistered,
-    isAccredited,
-    hasVoted,
-  };
-}
-
 // Hook for creating elections - keeping original implementation
 export function useCreateElection() {
   const { address } = useAccount();
@@ -188,7 +99,7 @@ export function useCreateElection() {
   const [error, setError] = useState<string | null>(null);
 
   const {
-    writeContract,
+    writeContractAsync, // Use writeContractAsync instead of writeContract
     data: hash,
     isPending,
     error: writeError,
@@ -231,37 +142,40 @@ export function useCreateElection() {
       setError(null);
 
       try {
-        console.log("Calling writeContract with:");
+        console.log("Calling writeContractAsync with:");
         console.log("- Contract address:", contractAddress);
         console.log("- Chain ID:", chainId);
         console.log("- Function: createElection");
         console.log("- Args:", [params.electionParams]);
 
-        writeContract({
+        // Wait for the transaction to be submitted
+        const transactionHash = await writeContractAsync({
           abi,
           address: contractAddress,
           functionName: "createElection",
           args: [params.electionParams],
         });
 
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
+        console.log("writeContractAsync completed successfully");
+        console.log("Transaction hash:", transactionHash);
 
         return {
           success: true,
           message:
-            "Election creation transaction submitted! Please confirm in MetaMask and wait for blockchain confirmation.",
-          hash: hash,
+            "Election creation transaction submitted! Please wait for blockchain confirmation.",
+          hash: transactionHash,
         };
       } catch (err) {
         console.error("=== CREATE ELECTION ERROR ===");
         console.error("Error details:", err);
-        console.error("Write error:", writeError);
 
         let errorMessage = "Failed to create election";
 
         if (err instanceof Error) {
-          if (err.message.includes("User rejected")) {
+          if (
+            err.message.includes("User rejected") ||
+            err.message.includes("user rejected")
+          ) {
             errorMessage = "Transaction was rejected by user";
           } else if (err.message.includes("insufficient funds")) {
             errorMessage = "Insufficient funds for gas fees";
@@ -279,7 +193,7 @@ export function useCreateElection() {
         console.log("=== CREATE ELECTION END ===");
       }
     },
-    [address, chainId, writeContract, hash, writeError],
+    [address, chainId, writeContractAsync], // Remove hash and writeError from dependencies
   );
 
   return {
@@ -295,7 +209,6 @@ export function useCreateElection() {
     isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }
-
 // ENHANCED Hook for accrediting voters with validation
 // Hook for accrediting voters - UPDATED for new ABI
 // FIXED Hook for accrediting voters with proper validation

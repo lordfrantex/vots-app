@@ -3,10 +3,7 @@
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
 import { useMemo } from "react";
 import { abi } from "@/contracts/abi";
-import {
-  electionAddress,
-  SUPPORTED_CHAINS,
-} from "@/contracts/election-address";
+import { electionAddress } from "@/contracts/election-address";
 import type { Election } from "@/types/election";
 import type { Candidate } from "@/types/candidate";
 import type { Voter } from "@/types/voter";
@@ -14,12 +11,14 @@ import type { Category } from "@/types/category";
 import type { PollingOfficer } from "@/types/polling-officer";
 import type { PollingUnit } from "@/types/polling-unit";
 import {
-  convertCandidateFromContractEnhanced,
-  convertVoterForPollingOfficerEnhanced,
-  OffChainDataService,
+  convertCandidateFromContract,
+  convertVoterFromContract,
+  convertPollingOfficerFromContract,
+  convertPollingUnitFromContract,
   type ContractCandidateInfoDTO,
   type ContractElectionVoterResponse,
-  type PollingOfficerVoterView,
+  type ContractPollingOfficerInfoDTO,
+  type ContractPollingUnitInfoDTO,
 } from "@/utils/contract-helpers";
 import { sepolia } from "wagmi/chains";
 
@@ -53,20 +52,20 @@ interface ContractElectionInfo {
   candidatesList: readonly ContractCandidateInfoDTO[];
 }
 
-// Election state enum mapping - UPDATED for new states
-const ELECTION_STATE_MAP = {
-  0: "UPCOMING" as const, // OPENED
-  1: "ACTIVE" as const, // STARTED
-  2: "COMPLETED" as const, // ENDED
-} as const;
-
-// Helper functions
+// Helper: Convert timestamp to ISO string
 const timestampToDateTimeString = (timestamp: bigint): string => {
   const date = new Date(Number(timestamp) * 1000);
   return date.toISOString();
 };
 
-// Determine election status based on timestamps and state
+// Election state enum mapping
+const ELECTION_STATE_MAP = {
+  0: "UPCOMING" as const,
+  1: "ACTIVE" as const,
+  2: "COMPLETED" as const,
+} as const;
+
+// Determine election status
 const determineElectionStatus = (
   contractState: number,
   startTimestamp: bigint,
@@ -76,24 +75,27 @@ const determineElectionStatus = (
   const start = Number(startTimestamp);
   const end = Number(endTimestamp);
 
-  // If contract state is COMPLETED, respect that
   if (contractState === 2) return "COMPLETED";
-
-  // Check timestamps for actual status
   if (now < start) return "UPCOMING";
   if (now >= start && now <= end) return "ACTIVE";
   if (now > end) return "COMPLETED";
-
-  // Fallback to contract state
   return (
     ELECTION_STATE_MAP[contractState as keyof typeof ELECTION_STATE_MAP] ||
     "UPCOMING"
   );
 };
 
-// Updated useContractElections hook - Fixed to use votedVotersCount from electionInfo
+export function useContractAddress(chainId?: number) {
+  const { chain } = useAccount();
+  const targetChainId = chainId || chain?.id || sepolia.id;
+  return (
+    electionAddress[targetChainId as keyof typeof electionAddress] ||
+    electionAddress[sepolia.id]
+  );
+}
 
-export const useContractElections = (preferredChainId?) => {
+// Main hook: get all elections
+export const useContractElections = (preferredChainId?: number) => {
   const { chain } = useAccount();
   const targetChainId = preferredChainId || chain?.id || sepolia.id;
   const contractAddress = useContractAddress(targetChainId);
@@ -109,51 +111,77 @@ export const useContractElections = (preferredChainId?) => {
     address: contractAddress,
     functionName: "getAllElectionsSummary",
     chainId: targetChainId,
-    query: {
-      enabled:
-        !!contractAddress && SUPPORTED_CHAINS.includes(targetChainId as any),
-    },
   });
 
-  // Get detailed info for each election
-  const electionIds = useMemo(() => {
+  // Get election IDs and their statuses
+  const electionMetadata = useMemo(() => {
     if (!electionsData) return [];
-    return (electionsData as ContractElectionSummary[]).map(
-      (election) => election.electionId,
-    );
+    return (electionsData as any[]).map((election) => {
+      const status = determineElectionStatus(
+        election.state,
+        election.startTimestamp,
+        election.endTimestamp,
+      );
+      return {
+        electionId: election.electionId,
+        status,
+        summary: election,
+      };
+    });
   }, [electionsData]);
 
-  // Prepare contracts for batch reading
+  // Prepare contracts for batch reading with conditional candidate fetching
   const detailContracts = useMemo(() => {
-    if (!electionIds.length) return [];
+    if (!electionMetadata.length) return [];
+    return electionMetadata.flatMap(({ electionId, status }) => {
+      const baseContracts = [
+        {
+          abi,
+          address: contractAddress,
+          functionName: "getElectionInfo",
+          args: [electionId],
+          chainId: targetChainId,
+        },
+        {
+          abi,
+          address: contractAddress,
+          functionName: "getAllVoters",
+          args: [electionId],
+          chainId: targetChainId,
+        },
+        {
+          abi,
+          address: contractAddress,
+          functionName: "getElectionStats",
+          args: [electionId],
+          chainId: targetChainId,
+        },
+      ];
 
-    return electionIds.flatMap((electionId) => [
-      {
-        abi,
-        address: contractAddress,
-        functionName: "getElectionInfo",
-        args: [electionId],
-      },
-      {
-        abi,
-        address: contractAddress,
-        functionName: "getAllVoters",
-        args: [electionId],
-      },
-      {
-        abi,
-        address: contractAddress,
-        functionName: "getElectionStats",
-        args: [electionId],
-      },
-      {
-        abi,
-        address: contractAddress,
-        functionName: "getAllCandidates",
-        args: [electionId],
-      },
-    ]);
-  }, [electionIds, contractAddress]);
+      // Conditionally add the appropriate candidate function based on status
+      if (status === "COMPLETED") {
+        // For completed elections, use getAllCandidates
+        baseContracts.push({
+          abi,
+          address: contractAddress,
+          functionName: "getAllCandidates",
+          args: [electionId],
+          chainId: targetChainId,
+        });
+      } else {
+        // For upcoming/active elections, use getAllCandidatesInDto
+        baseContracts.push({
+          abi,
+          address: contractAddress,
+          functionName: "getAllCandidatesInDto",
+          args: [electionId],
+          chainId: targetChainId,
+        });
+      }
+
+      return baseContracts;
+    });
+  }, [electionMetadata, contractAddress, targetChainId]);
 
   // Batch read all detailed data
   const {
@@ -161,237 +189,144 @@ export const useContractElections = (preferredChainId?) => {
     isLoading: isLoadingDetails,
     error: detailsError,
   } = useReadContracts({
-    contracts: detailContracts.map((contract) => ({
-      ...contract,
-      chainId: targetChainId,
-    })),
-    query: {
-      enabled: detailContracts.length > 0,
-    },
+    contracts: detailContracts,
   });
 
-  // Transform and combine all data - FIXED to use votedVotersCount from electionInfo
+  // Transform and combine all data
   const elections = useMemo(() => {
-    if (!electionsData || !detailsData) return [];
+    if (!electionsData || !detailsData || !electionMetadata.length) return [];
 
-    const summaries = electionsData as ContractElectionSummary[];
     const details = detailsData as Array<{ result?: unknown; error?: Error }>;
 
-    return summaries.map((summary, index) => {
-      const baseIndex = index * 4;
-      const electionId = summary.electionId.toString();
+    console.log("=== CONTRACT DATA DEBUG ===");
+    console.log("Election Metadata:", electionMetadata);
+    console.log("Details results:", details);
 
-      // Extract data from batch results
+    return electionMetadata.map((meta, index) => {
+      const { summary, status } = meta;
+      const baseIndex = index * 4; // 4 contracts per election
+
+      // Get individual results with error checking
       const electionInfoResult = details[baseIndex];
       const allVotersResult = details[baseIndex + 1];
       const electionStatsResult = details[baseIndex + 2];
-      const allCandidatesResult = details[baseIndex + 3];
+      const candidatesResult = details[baseIndex + 3]; // This will be either getAllCandidates or getAllCandidatesInDto
 
-      const electionInfo = electionInfoResult?.result as
-        | ContractElectionInfo
-        | undefined;
+      console.log(
+        `\n--- Election ${index} (ID: ${summary.electionId}, Status: ${status}) ---`,
+      );
+      console.log("Election Info Result:", electionInfoResult);
+      console.log("All Voters Result:", allVotersResult);
+      console.log("Candidates Result:", candidatesResult);
+
+      // Check for errors
+      if (electionInfoResult?.error) {
+        console.error("Election Info Error:", electionInfoResult.error);
+      }
+      if (allVotersResult?.error) {
+        console.error("Voters Error:", allVotersResult.error);
+      }
+      if (candidatesResult?.error) {
+        console.error("Candidates Error:", candidatesResult.error);
+      }
+
+      const electionInfo = electionInfoResult?.result as any;
       const allVotersData = allVotersResult?.result as
         | ContractElectionVoterResponse[]
         | undefined;
-      const electionStats = electionStatsResult?.result as
-        | [bigint, bigint, bigint, bigint, bigint, bigint]
+      const candidatesData = candidatesResult?.result as
+        | ContractCandidateInfoDTO[]
         | undefined;
 
-      // FIXED: Get votedVotersCount from electionInfo, not summary
-      const getVotedVotersCount = (): number => {
-        // First try from electionInfo (this is where it actually exists)
-        if (
-          electionInfo?.votedVotersCount !== undefined &&
-          electionInfo?.votedVotersCount !== null
-        ) {
-          const count = Number(electionInfo.votedVotersCount);
-          if (!isNaN(count)) return count;
-        }
+      console.log("Parsed Election Info:", electionInfo);
+      console.log("Parsed Voters Data:", allVotersData);
+      console.log("Parsed Candidates Data:", candidatesData);
+      console.log("Voters Array Length:", allVotersData?.length || 0);
+      console.log("Candidates Array Length:", candidatesData?.length || 0);
 
-        // Fallback: try from summary (if it exists)
-        if (
-          summary.votedVotersCount !== undefined &&
-          summary.votedVotersCount !== null
-        ) {
-          const count = Number(summary.votedVotersCount);
-          if (!isNaN(count)) return count;
-        }
-
-        // Final fallback: count from voters array
-        if (allVotersData) {
-          const votedCount = allVotersData.filter((voter) => {
-            return voter.hasVoted === true;
-          }).length;
-          return votedCount;
-        }
-
-        return 0;
-      };
-
-      const getRegisteredVotersCount = (): number => {
-        // Try from electionInfo first (more reliable)
-        if (
-          electionInfo?.registeredVotersCount !== undefined &&
-          electionInfo?.registeredVotersCount !== null
-        ) {
-          const count = Number(electionInfo.registeredVotersCount);
-          if (!isNaN(count)) return count;
-        }
-
-        // Fallback to summary
-        if (
-          summary.registeredVotersCount !== undefined &&
-          summary.registeredVotersCount !== null
-        ) {
-          const count = Number(summary.registeredVotersCount);
-          if (!isNaN(count)) return count;
-        }
-
-        return 0;
-      };
-
-      const getAccreditedVotersCount = (): number => {
-        // Try from electionInfo first (more reliable)
-        if (
-          electionInfo?.accreditedVotersCount !== undefined &&
-          electionInfo?.accreditedVotersCount !== null
-        ) {
-          const count = Number(electionInfo.accreditedVotersCount);
-          if (!isNaN(count)) return count;
-        }
-
-        // Fallback to summary
-        if (
-          summary.accreditedVotersCount !== undefined &&
-          summary.accreditedVotersCount !== null
-        ) {
-          const count = Number(summary.accreditedVotersCount);
-          if (!isNaN(count)) return count;
-        }
-
-        return 0;
-      };
-      //
-      // console.log(`Election ${electionId} vote counts:`, {
-      //   electionInfo: electionInfo ? "loaded" : "missing",
-      //   votedVotersCountFromElectionInfo: electionInfo?.votedVotersCount,
-      //   accreditedVotersCountFromElectionInfo:
-      //     electionInfo?.accreditedVotersCount,
-      //   registeredVotersCountFromElectionInfo:
-      //     electionInfo?.registeredVotersCount,
-      //   votedVotersCountFromSummary: summary.votedVotersCount,
-      //   accreditedVotersCountFromSummary: summary.accreditedVotersCount,
-      //   registeredVotersCountFromSummary: summary.registeredVotersCount,
-      //   calculatedVotedCount: getVotedVotersCount(),
-      //   calculatedAccreditedCount: getAccreditedVotersCount(),
-      //   calculatedRegisteredCount: getRegisteredVotersCount(),
-      // });
-
-      // Convert categories from blockchain data
-      const categories: Category[] =
-        electionInfo?.electionCategories.map((categoryName, idx) => ({
-          id: `${electionId}-cat-${idx}`,
-          name: categoryName,
-        })) || [];
-
-      // Convert candidates using enhanced function
-      const allCandidates = allCandidatesResult?.result as
-        | ContractElectionInfo[]
-        | undefined;
-
-      const candidates: Candidate[] =
-        allCandidates?.map((candidate, idx) =>
-          convertCandidateFromContractEnhanced(candidate, idx, electionId),
-        ) || [];
-
-      // Convert voters for POLLING OFFICERS (LIMITED INFO)
-      const pollingOfficerVoters: PollingOfficerVoterView[] =
-        allVotersData?.map((voterResponse, idx) => {
-          return convertVoterForPollingOfficerEnhanced(
-            voterResponse,
-            idx,
-            electionId,
-          );
-        }) || [];
-
-      // Convert to standard Voter interface for compatibility
-      const voters: Voter[] = pollingOfficerVoters.map((pollingVoter) => ({
-        id: pollingVoter.id,
-        name: pollingVoter.name,
-        matricNumber: pollingVoter.maskedMatricNumber,
-        isAccredited: pollingVoter.isAccredited,
-        hasVoted: pollingVoter.hasVoted,
+      // Categories
+      const categories: Category[] = (
+        electionInfo?.electionCategories || []
+      ).map((name: string, idx: number) => ({
+        id: `category-${idx}`,
+        name,
       }));
 
-      // Create polling officers and units from the new direct address arrays
+      // Candidates - process the data from whichever function was called
+      const candidates: Candidate[] = (candidatesData ?? []).map(
+        (candidate, idx) => {
+          console.log(
+            `Processing candidate ${idx} (Status: ${status}):`,
+            candidate,
+          );
+          return convertCandidateFromContract(candidate, idx);
+        },
+      );
+
+      // Voters - with more detailed logging
+      const voters: Voter[] = (allVotersData ?? []).map((voter, idx) => {
+        console.log(`Processing voter ${idx}:`, voter);
+        return convertVoterFromContract(voter, idx);
+      });
+
+      console.log("Final processed candidates:", candidates);
+      console.log("Final processed voters:", voters);
+
+      // Polling Officers
       const pollingOfficers: PollingOfficer[] = (
         electionInfo?.pollingOfficers || []
-      ).map((address, idx) => ({
-        id: `${electionId}-po-${idx}`,
-        address: address,
-        role: `Polling Officer ${idx + 1}`,
-      }));
+      ).map((address: string, idx: number) =>
+        convertPollingOfficerFromContract(
+          {
+            pollRoleName: `Officer ${idx + 1}`,
+            pollAddress: address as `0x${string}`,
+          },
+          idx,
+        ),
+      );
 
+      // Polling Units
       const pollingUnits: PollingUnit[] = (
         electionInfo?.pollingUnits || []
-      ).map((address, idx) => ({
-        id: `${electionId}-pu-${idx}`,
-        address: address,
-        name: `Polling Unit ${idx + 1}`,
-      }));
-
-      // Calculate total votes from candidates
-      const totalVotes = candidates.reduce(
-        (sum, candidate) => sum + (candidate.voteCount || 0),
-        0,
+      ).map((address: string, idx: number) =>
+        convertPollingUnitFromContract(
+          {
+            pollRoleName: `Unit ${idx + 1}`,
+            pollAddress: address as `0x${string}`,
+          },
+          idx,
+        ),
       );
 
-      // Get off-chain election metadata
-      const offChainData =
-        OffChainDataService.getElectionOffChainData(electionId);
-
-      // Determine accurate election status
-      const actualStatus = determineElectionStatus(
-        summary.state,
-        summary.startTimestamp,
-        summary.endTimestamp,
-      );
-
-      // FIXED: Use the proper vote counts
-      const totalVoters = getRegisteredVotersCount();
-      const votedVotersCount = getVotedVotersCount();
-      const accreditedVotersCount = getAccreditedVotersCount();
-
-      // Build complete election object
+      // Build election object
       const election: Election = {
-        id: electionId,
+        id: summary.electionId.toString(),
         name: summary.electionName,
         startDate: timestampToDateTimeString(summary.startTimestamp),
         endDate: timestampToDateTimeString(summary.endTimestamp),
-        status: actualStatus,
+        status,
         categories,
-        totalVoters, // From registeredVotersCount
-        totalVotes: votedVotersCount,
-        accreditedVoters: accreditedVotersCount,
+        totalVoters: Number(summary.registeredVotersCount ?? 0),
+        totalVotes: Number(summary.votedVotersCount ?? 0),
+        accreditedVoters: Number(summary.accreditedVotersCount ?? 0),
         candidates,
         voters,
         pollingOfficers,
         pollingUnits,
         createdBy: electionInfo?.createdBy,
-        description:
-          summary.electionDescription ||
-          offChainData?.electionMetadata?.description ||
-          `Election for ${summary.electionName}`,
-        bannerImage:
-          offChainData?.electionMetadata?.bannerImage || "/placeholder.jpg",
+        description: summary.electionDescription,
         isPublished: true,
         timezone: "UTC",
         metadata: {},
       };
 
+      console.log("Final election object:", election);
+      console.log("Final candidates count:", election.candidates.length);
+      console.log("Final voters count:", election.voters.length);
+
       return election;
     });
-  }, [electionsData, detailsData]);
+  }, [electionsData, detailsData, electionMetadata]);
 
   const isLoading = isLoadingSummary || isLoadingDetails;
   const error = summaryError || detailsError;
@@ -403,33 +338,48 @@ export const useContractElections = (preferredChainId?) => {
     refetch: refetchSummary,
   };
 };
-// Hook for getting a single election with full details - UPDATED for new ABI
-// Updated useElectionDetails hook - Fixed to use votedVotersCount from electionInfo
 
-// Updated useElectionDetails hook - Fixed to include all details like useContractElections
+// Hook for getting a single election with full details
 export const useElectionDetails = (
   electionId: string | null,
-  preferredChainId?,
+  preferredChainId?: number,
 ) => {
   const { chain } = useAccount();
   const targetChainId = preferredChainId || chain?.id || sepolia.id;
   const contractAddress = useContractAddress(targetChainId);
 
-  const contracts = useMemo(() => {
-    if (!electionId) return [];
+  // First, get basic election info to determine status
+  const { data: electionBasicInfo, isLoading: isLoadingBasicInfo } =
+    useReadContract({
+      abi,
+      address: contractAddress,
+      functionName: "getElectionInfo",
+      args: electionId ? [BigInt(electionId)] : undefined,
+      chainId: targetChainId,
+    });
 
+  // Determine election status from basic info
+  const electionStatus = useMemo(() => {
+    if (!electionBasicInfo) return null;
+    const info = electionBasicInfo as any;
+    return determineElectionStatus(
+      info.state,
+      info.startTimestamp,
+      info.endTimestamp,
+    );
+  }, [electionBasicInfo]);
+
+  const contracts = useMemo(() => {
+    if (!electionId || !electionStatus) return [];
     const id = BigInt(electionId);
-    return [
+
+    const baseContracts = [
       {
         abi,
         address: contractAddress,
         functionName: "getElectionInfo",
         args: [id],
         chainId: targetChainId,
-        query: {
-          enabled: !!contractAddress && id > 0n,
-          staleTime: 0,
-        },
       },
       {
         abi,
@@ -437,10 +387,6 @@ export const useElectionDetails = (
         functionName: "getAllVoters",
         args: [id],
         chainId: targetChainId,
-        query: {
-          enabled: !!contractAddress && id > 0n,
-          staleTime: 0,
-        },
       },
       {
         abi,
@@ -448,219 +394,132 @@ export const useElectionDetails = (
         functionName: "getElectionStats",
         args: [id],
         chainId: targetChainId,
-        query: {
-          enabled: !!contractAddress && id > 0n,
-          staleTime: 0,
-        },
       },
-      // ADDED: Missing getAllCandidates call
-      {
+    ];
+
+    // Add appropriate candidate function based on status
+    if (electionStatus === "COMPLETED") {
+      baseContracts.push({
         abi,
         address: contractAddress,
         functionName: "getAllCandidates",
         args: [id],
         chainId: targetChainId,
-        query: {
-          enabled: !!contractAddress && id > 0n,
-          staleTime: 0,
-        },
-      },
-    ];
-  }, [electionId, contractAddress]);
+      });
+    } else {
+      baseContracts.push({
+        abi,
+        address: contractAddress,
+        functionName: "getAllCandidatesInDto",
+        args: [id],
+        chainId: targetChainId,
+      });
+    }
+
+    return baseContracts;
+  }, [electionId, electionStatus, contractAddress, targetChainId]);
 
   const {
     data: contractData,
-    isLoading,
+    isLoading: isLoadingDetails,
     error,
     refetch,
   } = useReadContracts({
     contracts,
-    query: {
-      enabled: !!electionId,
-    },
   });
 
   const election = useMemo(() => {
-    if (!contractData || !electionId) return null;
-
-    // UPDATED: Now includes getAllCandidates result
+    if (!contractData || !electionId || !electionStatus) return null;
     const [
       electionInfoResult,
       allVotersResult,
-      electionStatsResult,
-      allCandidatesResult,
-    ] = contractData as Array<{
-      result?: unknown;
-      error?: Error;
-    }>;
+      _electionStatsResult,
+      candidatesResult,
+    ] = contractData as Array<{ result?: unknown; error?: Error }>;
 
-    const electionInfo = electionInfoResult?.result as
-      | ContractElectionInfo
-      | undefined;
+    const electionInfo = electionInfoResult?.result as any;
     const allVotersData = allVotersResult?.result as
       | ContractElectionVoterResponse[]
       | undefined;
-    const electionStats = electionStatsResult?.result as
-      | [bigint, bigint, bigint, bigint, bigint, bigint]
-      | undefined;
-    // ADDED: Extract candidates from getAllCandidates result
-    const allCandidates = allCandidatesResult?.result as
-      | ContractElectionInfo[]
+    const candidatesData = candidatesResult?.result as
+      | ContractCandidateInfoDTO[]
       | undefined;
 
-    if (!electionInfo) return null;
+    console.log(`Single Election Detail (Status: ${electionStatus}):`, {
+      electionInfo,
+      allVotersData,
+      candidatesData,
+    });
 
-    // FIXED: Complete helper functions to get all vote counts (same as useContractElections)
-    const getVotedVotersCount = (): number => {
-      // First try from electionInfo (this is where it actually exists)
-      if (
-        electionInfo.votedVotersCount !== undefined &&
-        electionInfo.votedVotersCount !== null
-      ) {
-        const count = Number(electionInfo.votedVotersCount);
-        if (!isNaN(count)) return count;
-      }
-
-      // Final fallback: count from voters array
-      if (allVotersData) {
-        const votedCount = allVotersData.filter((voter) => {
-          return voter.hasVoted === true;
-        }).length;
-        return votedCount;
-      }
-
-      return 0;
-    };
-
-    const getRegisteredVotersCount = (): number => {
-      if (
-        electionInfo.registeredVotersCount !== undefined &&
-        electionInfo.registeredVotersCount !== null
-      ) {
-        const count = Number(electionInfo.registeredVotersCount);
-        if (!isNaN(count)) return count;
-      }
-
-      return 0;
-    };
-
-    // ADDED: Missing accredited voters count function
-    const getAccreditedVotersCount = (): number => {
-      if (
-        electionInfo.accreditedVotersCount !== undefined &&
-        electionInfo.accreditedVotersCount !== null
-      ) {
-        const count = Number(electionInfo.accreditedVotersCount);
-        if (!isNaN(count)) return count;
-      }
-
-      return 0;
-    };
-
-    // Convert all data from blockchain
-    const categories: Category[] = electionInfo.electionCategories.map(
-      (categoryName, idx) => ({
-        id: `${electionId}-cat-${idx}`,
-        name: categoryName,
+    // Categories
+    const categories: Category[] = (electionInfo?.electionCategories || []).map(
+      (name: string, idx: number) => ({
+        id: `category-${idx}`,
+        name,
       }),
     );
 
-    // UPDATED: Use getAllCandidates result instead of candidatesList from electionInfo
-    const candidates: Candidate[] =
-      allCandidates?.map((candidate, idx) =>
-        convertCandidateFromContractEnhanced(candidate, idx, electionId),
-      ) ||
-      // Fallback to candidatesList if getAllCandidates fails
-      electionInfo.candidatesList.map((candidate, idx) =>
-        convertCandidateFromContractEnhanced(candidate, idx, electionId),
-      );
+    // Candidates
+    const candidates: Candidate[] = (candidatesData || []).map(
+      (candidate, idx) => convertCandidateFromContract(candidate, idx),
+    );
 
-    // Convert voters for POLLING OFFICERS (LIMITED INFO)
-    const pollingOfficerVoters: PollingOfficerVoterView[] =
-      allVotersData?.map((voterResponse, idx) => {
-        return convertVoterForPollingOfficerEnhanced(
-          voterResponse,
+    // Voters
+    const voters: Voter[] = (allVotersData || []).map((voter, idx) =>
+      convertVoterFromContract(voter, idx),
+    );
+
+    // Polling Officers
+    const pollingOfficers: PollingOfficer[] = (
+      electionInfo?.pollingOfficers || []
+    ).map((address: string, idx: number) =>
+      convertPollingOfficerFromContract(
+        {
+          pollRoleName: `Officer ${idx + 1}`,
+          pollAddress: address as `0x${string}`,
+        },
+        idx,
+      ),
+    );
+
+    // Polling Units
+    const pollingUnits: PollingUnit[] = (electionInfo?.pollingUnits || []).map(
+      (address: string, idx: number) =>
+        convertPollingUnitFromContract(
+          {
+            pollRoleName: `Unit ${idx + 1}`,
+            pollAddress: address as `0x${string}`,
+          },
           idx,
-          electionId,
-        );
-      }) || [];
-
-    // Convert to standard Voter interface for compatibility
-    const voters: Voter[] = pollingOfficerVoters.map((pollingVoter) => ({
-      id: pollingVoter.id,
-      name: pollingVoter.name,
-      matricNumber: pollingVoter.maskedMatricNumber,
-      isAccredited: pollingVoter.isAccredited,
-      hasVoted: pollingVoter.hasVoted,
-    }));
-
-    // Create polling officers and units from direct address arrays
-    const pollingOfficers: PollingOfficer[] = electionInfo.pollingOfficers.map(
-      (address, idx) => ({
-        id: `${electionId}-po-${idx}`,
-        address: address,
-        role: `Polling Officer ${idx + 1}`,
-      }),
+        ),
     );
 
-    const pollingUnits: PollingUnit[] = electionInfo.pollingUnits.map(
-      (address, idx) => ({
-        id: `${electionId}-pu-${idx}`,
-        address: address,
-        name: `Polling Unit ${idx + 1}`,
-      }),
-    );
-
-    // UPDATED: Calculate total votes from candidates (same as useContractElections)
-    const totalVotes = candidates.reduce(
-      (sum, candidate) => sum + (candidate.voteCount || 0),
-      0,
-    );
-
-    // Get off-chain election metadata
-    const offChainData =
-      OffChainDataService.getElectionOffChainData(electionId);
-
-    // Determine accurate election status
-    const actualStatus = determineElectionStatus(
-      electionInfo.state,
-      electionInfo.startTimestamp,
-      electionInfo.endTimestamp,
-    );
-
-    // FIXED: Use all the proper vote counts (same as useContractElections)
-    const totalVoters = getRegisteredVotersCount();
-    const votedVotersCount = getVotedVotersCount();
-    const accreditedVotersCount = getAccreditedVotersCount(); // ADDED: This was missing
-
+    // Build election object
     const election: Election = {
       id: electionId,
       name: electionInfo.electionName,
       startDate: timestampToDateTimeString(electionInfo.startTimestamp),
       endDate: timestampToDateTimeString(electionInfo.endTimestamp),
-      status: actualStatus,
+      status: electionStatus,
       categories,
-      totalVoters, // From registeredVotersCount
-      totalVotes: votedVotersCount, // FIXED: Use votedVotersCount from electionInfo
-      accreditedVoters: accreditedVotersCount, // ADDED: This was missing
+      totalVoters: Number(electionInfo.registeredVotersCount),
+      totalVotes: Number(electionInfo.votedVotersCount),
+      accreditedVoters: Number(electionInfo.accreditedVotersCount),
       candidates,
       voters,
       pollingOfficers,
       pollingUnits,
-      createdBy: electionInfo.createdBy,
-      description:
-        electionInfo.electionDescription ||
-        offChainData?.electionMetadata?.description ||
-        `Election for ${electionInfo.electionName}`,
-      bannerImage:
-        offChainData?.electionMetadata?.bannerImage || "/placeholder.jpg",
+      createdBy: electionInfo?.createdBy,
+      description: electionInfo.electionDescription,
       isPublished: true,
       timezone: "UTC",
       metadata: {},
     };
 
     return election;
-  }, [contractData, electionId]);
+  }, [contractData, electionId, electionStatus]);
+
+  const isLoading = isLoadingBasicInfo || isLoadingDetails;
 
   return {
     election,
@@ -669,13 +528,3 @@ export const useElectionDetails = (
     refetch,
   };
 };
-
-export function useContractAddress(chainId?: number) {
-  const { chain } = useAccount();
-  const targetChainId = chainId || chain?.id || sepolia.id; // Default to Sepolia
-
-  return (
-    electionAddress[targetChainId as keyof typeof electionAddress] ||
-    electionAddress[sepolia.id]
-  );
-}

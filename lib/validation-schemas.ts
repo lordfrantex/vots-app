@@ -197,11 +197,11 @@ export const votersSchema = z
               /^[a-zA-Z0-9/-]+$/,
               "Matric number contains invalid characters",
             ),
-          email: z
+          level: z
             .string()
-            .email("Invalid email address")
-            .optional()
-            .or(z.literal("")),
+            .min(1, "Level is required") // Make it required instead of optional
+            .max(10, "Level must not exceed 10 characters")
+            .regex(/^[0-9]+$/, "Level must be a number"),
           department: z
             .string()
             .max(50, "Department name must not exceed 50 characters")
@@ -233,6 +233,10 @@ export const pollingSetupSchema = z.object({
         id: z.string(),
         address: walletAddressSchema,
         role: z.string(),
+        name: z
+          .string()
+          .min(2, "Unit name must be at least 2 characters")
+          .max(30, "Unit name must not exceed 30 characters"),
       }),
     )
     .min(1, "At least one polling officer is required")

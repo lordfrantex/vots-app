@@ -159,20 +159,30 @@ export const abi = [
             components: [
               { internalType: "string", name: "name", type: "string" },
               { internalType: "string", name: "matricNo", type: "string" },
+              { internalType: "string", name: "department", type: "string" },
+              { internalType: "uint256", name: "level", type: "uint256" },
             ],
             internalType: "struct IElection.VoterInfoDTO[]",
             name: "votersList",
             type: "tuple[]",
           },
           {
-            internalType: "address[]",
-            name: "pollingUnitAddresses",
-            type: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
+            name: "pollingUnits",
+            type: "tuple[]",
           },
           {
-            internalType: "address[]",
-            name: "pollingOfficerAddresses",
-            type: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
+            name: "pollingOfficers",
+            type: "tuple[]",
           },
           {
             internalType: "string[]",
@@ -226,6 +236,8 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
           {
             internalType: "enum IElection.VoterState",
             name: "voterState",
@@ -327,6 +339,8 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
           {
             internalType: "enum IElection.VoterState",
             name: "voterState",
@@ -350,6 +364,8 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
           {
             internalType: "enum IElection.VoterState",
             name: "voterState",
@@ -455,14 +471,22 @@ export const abi = [
             type: "string[]",
           },
           {
-            internalType: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
             name: "pollingOfficers",
-            type: "address[]",
+            type: "tuple[]",
           },
           {
-            internalType: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
             name: "pollingUnits",
-            type: "address[]",
+            type: "tuple[]",
           },
           {
             components: [

@@ -2,7 +2,7 @@
 
 import type { ValidationData } from "@/types/validation-data";
 
-// These interfaces match exactly what your NEW ABI expects/returns
+// Core contract interfaces that match your ABI
 export interface ContractCandidateInfoDTO {
   readonly name: string;
   readonly matricNo: string;
@@ -14,14 +14,28 @@ export interface ContractCandidateInfoDTO {
 export interface ContractVoterInfoDTO {
   readonly name: string;
   readonly matricNo: string;
+  readonly department: string; // Added department field
+  readonly level: bigint;
 }
 
 export interface ContractElectionVoterResponse {
   readonly name: string;
+  readonly department: string; // Added department field
+  readonly level: bigint;
   readonly voterState: number; // 0 = UNKNOWN, 1 = REGISTERED, 2 = ACCREDITED, 3 = VOTED
 }
 
-// NEW: ElectionParams structure for the new ABI
+export interface ContractPollingUnitInfoDTO {
+  readonly pollRoleName: string; // Changed from 'name' to 'pollRoleName'
+  readonly pollAddress: `0x${string}`; // Changed from 'address' to 'pollAddress'
+}
+
+export interface ContractPollingOfficerInfoDTO {
+  readonly pollRoleName: string; // Changed from 'name' to 'pollRoleName'
+  readonly pollAddress: `0x${string}`; // Changed from 'address' to 'pollAddress'
+}
+
+// ElectionParams structure for the contract
 export interface ContractElectionParams {
   startTimeStamp: bigint;
   endTimeStamp: bigint;
@@ -29,12 +43,12 @@ export interface ContractElectionParams {
   description: string;
   candidatesList: readonly ContractCandidateInfoDTO[];
   votersList: readonly ContractVoterInfoDTO[];
-  pollingUnitAddresses: readonly `0x${string}`[];
-  pollingOfficerAddresses: readonly `0x${string}`[];
+  pollingUnits: readonly ContractPollingUnitInfoDTO[];
+  pollingOfficers: readonly ContractPollingOfficerInfoDTO[];
   electionCategories: readonly string[];
 }
 
-// Extended interfaces for frontend that combine blockchain + off-chain data
+// Frontend interfaces for extended functionality
 export interface ExtendedCandidateInfo {
   // From blockchain
   name: string;
@@ -42,90 +56,47 @@ export interface ExtendedCandidateInfo {
   category: string;
   voteFor?: number;
   voteAgainst?: number;
+  voteCount?: number;
 
-  // Frontend-only fields (stored separately)
+  // Frontend-only fields
   id: string;
   photo?: string;
-  voteCount?: number;
-  biography?: string;
-  manifesto?: string;
 }
 
-// For polling officers - LIMITED INFO for trustless system
-export interface PollingOfficerVoterView {
-  id: string;
-  name: string;
-  maskedMatricNumber: string; // Only show partial matric number like "CSC/25/****"
-  photo?: string; // For ID verification
-  isAccredited: boolean;
-  hasVoted: boolean;
-  // NO email, department, or full matric number for security
-}
-
-// For voters - FULL INFO for voting
 export interface ExtendedVoterInfo {
   // From blockchain
   name: string;
-  matricNumber: string; // Full matric number for voting login
+  matricNumber: string;
+  department: string; // Added department field
+  level: string;
+  voterState: number;
 
-  // Frontend-only fields (stored separately - database/localStorage/etc)
+  // Frontend-only fields
   id: string;
-  email?: string;
-  department?: string;
-  isAccredited?: boolean;
-  hasVoted?: boolean;
-  phoneNumber?: string;
-  yearOfStudy?: number;
+  // Computed fields
+  isRegistered: boolean;
+  isAccredited: boolean;
+  hasVoted: boolean;
 }
 
-// Off-chain data storage interface - UPDATED for trustless system
-export interface OffChainElectionData {
-  electionId: string;
+export interface ExtendedPollingUnitInfo {
+  // From blockchain
+  name: string;
+  address: `0x${string}`;
 
-  // Additional candidate data not on blockchain
-  candidatesMetadata: Record<
-    string,
-    {
-      photo?: string;
-      biography?: string;
-      manifesto?: string;
-      socialMedia?: {
-        twitter?: string;
-        instagram?: string;
-      };
-    }
-  >;
+  // Frontend-only fields
+  id: string;
+  description?: string;
+  location?: string;
+}
 
-  // Voter data for polling officers (LIMITED INFO)
-  pollingOfficerVoterData: Record<
-    string, // name as key (since that's what blockchain returns)
-    {
-      maskedMatricNumber: string; // Partial matric like "CSC/25/****"
-      photo?: string;
-      department?: string; // For ID verification only
-    }
-  >;
+export interface ExtendedPollingOfficerInfo {
+  // From blockchain
+  name: string;
+  address: `0x${string}`;
 
-  // Full voter data for voting (COMPLETE INFO) - encrypted or secured
-  voterCredentials: Record<
-    string, // full matric number as key
-    {
-      name: string;
-      email?: string;
-      department?: string;
-      phoneNumber?: string;
-      yearOfStudy?: number;
-      // This is what voters use to login and vote
-    }
-  >;
-
-  // Election metadata not on blockchain
-  electionMetadata: {
-    description?: string;
-    bannerImage?: string;
-    rules?: string[];
-    instructions?: string;
-  };
+  // Frontend-only fields
+  id: string;
 }
 
 // Helper functions
@@ -140,14 +111,6 @@ function validateAddress(address: string): `0x${string}` | null {
     return null;
   }
   return prefixedAddress as `0x${string}`;
-}
-
-function convertToAddressArray(addresses: string[]): readonly `0x${string}`[] {
-  return addresses
-    .map(validateAddress)
-    .filter(
-      (address): address is `0x${string}` => address !== null,
-    ) as readonly `0x${string}`[];
 }
 
 function safeString(value: any): string {
@@ -166,25 +129,7 @@ function safeBigInt(value: any): bigint {
   return BigInt(0);
 }
 
-// Helper function to mask matriculation number for polling officers
-function maskMatricNumber(fullMatricNo: string): string {
-  if (!fullMatricNo) return "****";
-
-  // For matric like "CSC/25/0001", show "CSC/25/****"
-  const parts = fullMatricNo.split("/");
-  if (parts.length >= 3) {
-    return `${parts[0]}/${parts[1]}/****`;
-  }
-
-  // For other formats, mask last 4 characters
-  if (fullMatricNo.length > 4) {
-    return fullMatricNo.substring(0, fullMatricNo.length - 4) + "****";
-  }
-
-  return "****";
-}
-
-// Convert frontend candidate data to contract format (only blockchain fields)
+// Conversion functions
 export function convertCandidateToContract(
   candidate: ExtendedCandidateInfo,
 ): ContractCandidateInfoDTO {
@@ -197,25 +142,54 @@ export function convertCandidateToContract(
   } as const;
 }
 
-// Convert frontend voter data to contract format (only blockchain fields)
 export function convertVoterToContract(
   voter: ExtendedVoterInfo,
 ): ContractVoterInfoDTO {
   return {
     name: safeString(voter.name),
     matricNo: safeString(voter.matricNumber),
+    department: safeString(voter.department || "General"), // Default department if not provided
+    level: safeBigInt(voter.level),
   } as const;
 }
 
-// Convert contract candidate data to frontend format (blockchain + defaults for frontend fields)
+export function convertPollingUnitToContract(
+  unit: ExtendedPollingUnitInfo,
+): ContractPollingUnitInfoDTO {
+  console.log("Converting polling unit:", unit);
+
+  const validatedAddress = validateAddress(unit.address);
+  if (!validatedAddress) {
+    console.error(`Invalid polling unit address: ${unit.address}`);
+    throw new Error(`Invalid polling unit address: ${unit.address}`);
+  }
+
+  return {
+    pollRoleName: safeString(unit.name), // Changed from 'name' to 'pollRoleName'
+    pollAddress: validatedAddress, // Changed from 'address' to 'pollAddress'
+  } as const;
+}
+
+export function convertPollingOfficerToContract(
+  officer: ExtendedPollingOfficerInfo,
+): ContractPollingOfficerInfoDTO {
+  const validatedAddress = validateAddress(officer.address);
+  if (!validatedAddress) {
+    throw new Error(`Invalid polling officer address: ${officer.address}`);
+  }
+
+  return {
+    pollRoleName: safeString(officer.name), // Changed from 'name' to 'pollRoleName'
+    pollAddress: validatedAddress, // Changed from 'address' to 'pollAddress'
+  } as const;
+}
+
+// Convert contract data back to frontend format
 export function convertCandidateFromContract(
   contractCandidate: ContractCandidateInfoDTO,
   index: number,
-  offChainData?: OffChainElectionData,
 ): ExtendedCandidateInfo {
   const candidateId = `candidate-${contractCandidate.matricNo}-${index}`;
-  const metadata =
-    offChainData?.candidatesMetadata?.[contractCandidate.matricNo] || {};
 
   return {
     // From blockchain
@@ -226,225 +200,69 @@ export function convertCandidateFromContract(
     voteAgainst: Number(contractCandidate.voteAgainst),
     voteCount: Number(contractCandidate.voteFor),
 
-    // Frontend fields (from off-chain data or defaults)
+    // Frontend defaults
     id: candidateId,
-    photo: metadata.photo || "/placeholder-user.jpg",
-    biography: metadata.biography,
-    manifesto: metadata.manifesto,
+    photo: "/placeholder-user.jpg",
   };
 }
 
-// Convert blockchain voter response to POLLING OFFICER VIEW (LIMITED INFO)
-export function convertVoterForPollingOfficer(
-  voterResponse: ContractElectionVoterResponse,
+export function convertVoterFromContract(
+  contractVoter: ContractElectionVoterResponse,
   index: number,
-  offChainData?: OffChainElectionData,
-): PollingOfficerVoterView {
-  const voterId = `voter-po-${index}`;
-  const pollingData =
-    offChainData?.pollingOfficerVoterData?.[voterResponse.name] || {};
-
-  const convertedVoter: PollingOfficerVoterView = {
-    // Limited info for polling officers
-    id: voterId,
-    name: voterResponse.name,
-    maskedMatricNumber:
-      pollingData.maskedMatricNumber || maskMatricNumber("UNKNOWN"),
-    photo: pollingData.photo || "/placeholder-user.jpg",
-
-    // Status from blockchain - UPDATED for new voter states
-    isAccredited: voterResponse.voterState >= 2, // 2 = ACCREDITED, 3 = VOTED
-    hasVoted: voterResponse.voterState === 3, // 3 = VOTED
-  };
-
-  return convertedVoter;
-}
-
-// Convert blockchain voter response to FULL VOTER INFO (for voting interface)
-export function convertVoterForVoting(
-  voterResponse: ContractElectionVoterResponse,
-  fullMatricNo: string, // This comes from voter login
-  index: number,
-  offChainData?: OffChainElectionData,
 ): ExtendedVoterInfo {
-  const voterId = `voter-full-${fullMatricNo}-${index}`;
-  const voterCredentials = offChainData?.voterCredentials?.[fullMatricNo] || {};
+  const voterId = `voter-${contractVoter.name}-${index}`;
 
-  const convertedVoter: ExtendedVoterInfo = {
-    // Full info for voting
+  return {
+    // From blockchain
+    name: contractVoter.name,
+    matricNumber: "", // This might need to be populated separately
+    department: contractVoter.department,
+    level: Number(contractVoter.level).toString(),
+    voterState: contractVoter.voterState,
+
+    // Frontend fields
     id: voterId,
-    name: voterResponse.name,
-    matricNumber: fullMatricNo,
 
-    // Additional info from off-chain data
-    email: voterCredentials.email,
-    department: voterCredentials.department,
-    phoneNumber: voterCredentials.phoneNumber,
-    yearOfStudy: voterCredentials.yearOfStudy,
-
-    // Status from blockchain - UPDATED for new voter states
-    isAccredited: voterResponse.voterState >= 2, // 2 = ACCREDITED, 3 = VOTED
-    hasVoted: voterResponse.voterState === 3, // 3 = VOTED
+    // Computed fields
+    isRegistered: contractVoter.voterState >= 1,
+    isAccredited: contractVoter.voterState >= 2,
+    hasVoted: contractVoter.voterState === 3,
   };
-
-  return convertedVoter;
 }
 
-// Service functions for managing off-chain data
-export class OffChainDataService {
-  private static storageKey = "election-offchain-data";
-
-  // Get off-chain data for an election
-  static getElectionOffChainData(
-    electionId: string,
-  ): OffChainElectionData | null {
-    try {
-      const data = localStorage.getItem(`${this.storageKey}-${electionId}`);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  // Save off-chain data for an election
-  static saveElectionOffChainData(
-    electionId: string,
-    data: OffChainElectionData,
-  ): void {
-    try {
-      localStorage.setItem(
-        `${this.storageKey}-${electionId}`,
-        JSON.stringify(data),
-      );
-    } catch (error) {
-      console.error("Error saving off-chain data:", error);
-    }
-  }
-
-  // Update candidate metadata
-  static updateCandidateMetadata(
-    electionId: string,
-    matricNo: string,
-    metadata: OffChainElectionData["candidatesMetadata"][string],
-  ): void {
-    const existingData = this.getElectionOffChainData(electionId) || {
-      electionId,
-      candidatesMetadata: {},
-      pollingOfficerVoterData: {},
-      voterCredentials: {},
-      electionMetadata: {},
-    };
-
-    existingData.candidatesMetadata[matricNo] = {
-      ...existingData.candidatesMetadata[matricNo],
-      ...metadata,
-    };
-
-    this.saveElectionOffChainData(electionId, existingData);
-  }
-
-  // Save election creation data - UPDATED for trustless system
-  static saveElectionCreationData(
-    electionId: string,
-    validationData: ValidationData,
-  ): void {
-    const offChainData: OffChainElectionData = {
-      electionId,
-      candidatesMetadata: {},
-      pollingOfficerVoterData: {},
-      voterCredentials: {},
-      electionMetadata: {
-        description: validationData.basicInfo.description,
-        bannerImage: "/placeholder.jpg",
-      },
-    };
-
-    // Save candidate metadata
-    validationData.candidates?.candidates?.forEach((candidate: any) => {
-      if (candidate.matricNo) {
-        offChainData.candidatesMetadata[candidate.matricNo] = {
-          photo: candidate.photo || "/placeholder-user.jpg",
-          biography: candidate.biography,
-          manifesto: candidate.manifesto,
-        };
-      }
-    });
-
-    // Save voter data - SPLIT into polling officer view and full credentials
-    validationData.voters?.voters?.forEach((voter: any) => {
-      if (voter.matricNumber && voter.name) {
-        // Limited data for polling officers (by name)
-        offChainData.pollingOfficerVoterData[voter.name] = {
-          maskedMatricNumber: maskMatricNumber(voter.matricNumber),
-          photo: voter.photo || "/placeholder-user.jpg",
-          department: voter.department, // For ID verification only
-        };
-
-        // Full credentials for voting (by matric number)
-        offChainData.voterCredentials[voter.matricNumber] = {
-          name: voter.name,
-          email: voter.email,
-          department: voter.department,
-          phoneNumber: voter.phoneNumber,
-          yearOfStudy: voter.yearOfStudy,
-        };
-      }
-    });
-
-    this.saveElectionOffChainData(electionId, offChainData);
-  }
-
-  // Verify voter credentials for voting (full matric + name)
-  static verifyVoterCredentials(
-    electionId: string,
-    name: string,
-    matricNo: string,
-  ): boolean {
-    const offChainData = this.getElectionOffChainData(electionId);
-    if (!offChainData) return false;
-
-    const credentials = offChainData.voterCredentials[matricNo];
-    return credentials && credentials.name.toLowerCase() === name.toLowerCase();
-  }
-}
-
-// Enhanced conversion functions that use off-chain data
-export function convertCandidateFromContractEnhanced(
-  contractCandidate: ContractCandidateInfoDTO,
+export function convertPollingUnitFromContract(
+  contractUnit: ContractPollingUnitInfoDTO,
   index: number,
-  electionId: string,
-): ExtendedCandidateInfo {
-  const offChainData = OffChainDataService.getElectionOffChainData(electionId);
-  return convertCandidateFromContract(contractCandidate, index, offChainData);
+): ExtendedPollingUnitInfo {
+  const unitId = `polling-unit-${index}`;
+
+  return {
+    // From blockchain
+    name: contractUnit.pollRoleName, // Changed from 'name' to 'pollRoleName'
+    address: contractUnit.pollAddress, // Changed from 'address' to 'pollAddress'
+
+    // Frontend fields
+    id: unitId,
+  };
 }
 
-// For polling officers - limited voter info
-export function convertVoterForPollingOfficerEnhanced(
-  voterResponse: ContractElectionVoterResponse,
+export function convertPollingOfficerFromContract(
+  contractOfficer: ContractPollingOfficerInfoDTO,
   index: number,
-  electionId: string,
-): PollingOfficerVoterView {
-  const offChainData = OffChainDataService.getElectionOffChainData(electionId);
-  return convertVoterForPollingOfficer(voterResponse, index, offChainData);
+): ExtendedPollingOfficerInfo {
+  const officerId = `polling-officer-${index}`;
+
+  return {
+    // From blockchain
+    name: contractOfficer.pollRoleName, // Changed from 'name' to 'pollRoleName'
+    address: contractOfficer.pollAddress, // Changed from 'address' to 'pollAddress'
+
+    // Frontend fields
+    id: officerId,
+  };
 }
 
-// For voting interface - full voter info
-export function convertVoterForVotingEnhanced(
-  voterResponse: ContractElectionVoterResponse,
-  fullMatricNo: string,
-  index: number,
-  electionId: string,
-): ExtendedVoterInfo {
-  const offChainData = OffChainDataService.getElectionOffChainData(electionId);
-  return convertVoterForVoting(
-    voterResponse,
-    fullMatricNo,
-    index,
-    offChainData,
-  );
-}
-
-// NEW: Convert validation data to the new ElectionParams structure
+// Main conversion function for ValidationData to ContractElectionParams
 export function convertToContractElectionParams(
   validationData: ValidationData,
 ): ContractElectionParams {
@@ -458,6 +276,7 @@ export function convertToContractElectionParams(
     const pollingUnits = validationData.polling?.pollingUnits || [];
     const pollingOfficers = validationData.polling?.pollingOfficers || [];
 
+    // Convert candidates
     const candidatesList: readonly ContractCandidateInfoDTO[] = candidates.map(
       (candidate: any, index: number) => {
         console.log(`Converting candidate ${index}:`, candidate);
@@ -465,32 +284,34 @@ export function convertToContractElectionParams(
       },
     ) as readonly ContractCandidateInfoDTO[];
 
+    // Convert voters with department and level
     const votersList: readonly ContractVoterInfoDTO[] = voters.map(
       (voter: any, index: number) => {
+        console.log(`Converting voter ${index}:`, voter);
         return convertVoterToContract(voter);
       },
     ) as readonly ContractVoterInfoDTO[];
 
-    const pollingUnitAddressStrings = pollingUnits
-      .map((unit: any) => safeString(unit.address))
-      .filter((address: string) => address.length > 0);
+    // Convert polling units - check if they have valid addresses
+    const pollingUnitsList: readonly ContractPollingUnitInfoDTO[] =
+      pollingUnits.map((unit: any, index: number) => {
+        console.log(`Converting polling unit ${index}:`, unit);
+        return convertPollingUnitToContract(unit);
+      }) as readonly ContractPollingUnitInfoDTO[];
 
-    const pollingUnitAddresses = convertToAddressArray(
-      pollingUnitAddressStrings,
-    );
+    // Convert polling officers - check if they have valid addresses
+    const pollingOfficersList: readonly ContractPollingOfficerInfoDTO[] =
+      pollingOfficers.map((officer: any, index: number) => {
+        console.log(`Converting polling officer ${index}:`, officer);
+        return convertPollingOfficerToContract(officer);
+      }) as readonly ContractPollingOfficerInfoDTO[];
 
-    const pollingOfficerAddressStrings = pollingOfficers
-      .map((officer: any) => safeString(officer.address))
-      .filter((address: string) => address.length > 0);
-
-    const pollingOfficerAddresses = convertToAddressArray(
-      pollingOfficerAddressStrings,
-    );
-
+    // Convert categories
     const electionCategories: readonly string[] = categories.map(
       (category: any) => safeString(category.name),
     ) as readonly string[];
 
+    // Handle timestamps
     let startTimeStamp: bigint;
     let endTimeStamp: bigint;
 
@@ -509,6 +330,7 @@ export function convertToContractElectionParams(
         throw new Error("End date must be after start date");
       }
 
+      // Adjust if start time is in the past
       const now = BigInt(Math.floor(Date.now() / 1000));
       if (startTimeStamp <= now) {
         console.warn(
@@ -531,8 +353,8 @@ export function convertToContractElectionParams(
       description: safeString(basicInfo.description || ""),
       candidatesList,
       votersList,
-      pollingUnitAddresses,
-      pollingOfficerAddresses,
+      pollingUnits: pollingUnitsList,
+      pollingOfficers: pollingOfficersList,
       electionCategories,
     };
 
@@ -543,8 +365,8 @@ export function convertToContractElectionParams(
       description: electionParams.description,
       candidatesCount: electionParams.candidatesList.length,
       votersCount: electionParams.votersList.length,
-      pollingUnitsCount: electionParams.pollingUnitAddresses.length,
-      pollingOfficersCount: electionParams.pollingOfficerAddresses.length,
+      pollingUnitsCount: electionParams.pollingUnits.length,
+      pollingOfficersCount: electionParams.pollingOfficers.length,
       categoriesCount: electionParams.electionCategories.length,
     });
 
@@ -557,6 +379,7 @@ export function convertToContractElectionParams(
   }
 }
 
+// Validation function
 export function validateContractElectionParams(
   params: ContractElectionParams,
 ): {
@@ -566,6 +389,7 @@ export function validateContractElectionParams(
   const errors: string[] = [];
 
   try {
+    // Basic validation
     if (!params.electionName || params.electionName.trim().length === 0) {
       errors.push("Election name is required");
     }
@@ -596,6 +420,9 @@ export function validateContractElectionParams(
         if (!voter.matricNo || voter.matricNo.trim().length === 0) {
           errors.push(`Voter ${index + 1}: Matric number is required`);
         }
+        if (!voter.department || voter.department.trim().length === 0) {
+          errors.push(`Voter ${index + 1}: Department is required`);
+        }
       });
     }
 
@@ -603,6 +430,7 @@ export function validateContractElectionParams(
       errors.push("At least one category is required");
     }
 
+    // Timestamp validation
     if (params.startTimeStamp >= params.endTimeStamp) {
       errors.push("End time must be after start time");
     }
@@ -614,14 +442,15 @@ export function validateContractElectionParams(
       errors.push("Invalid timestamp values");
     }
 
-    params.pollingUnitAddresses.forEach((address, index) => {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    // Address validation
+    params.pollingUnits.forEach((unit, index) => {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(unit.pollAddress)) {
         errors.push(`Polling unit ${index + 1}: Invalid address format`);
       }
     });
 
-    params.pollingOfficerAddresses.forEach((address, index) => {
-      if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    params.pollingOfficers.forEach((officer, index) => {
+      if (!/^0x[a-fA-F0-9]{40}$/.test(officer.pollAddress)) {
         errors.push(`Polling officer ${index + 1}: Invalid address format`);
       }
     });
@@ -635,4 +464,33 @@ export function validateContractElectionParams(
     isValid: errors.length === 0,
     errors,
   };
+}
+
+// Utility functions for common operations
+export function getVoterStateLabel(state: number): string {
+  switch (state) {
+    case 0:
+      return "Unknown";
+    case 1:
+      return "Registered";
+    case 2:
+      return "Accredited";
+    case 3:
+      return "Voted";
+    default:
+      return "Unknown";
+  }
+}
+
+export function formatAddress(address: string): string {
+  if (!address) return "";
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+}
+
+export function calculateVotePercentage(
+  votes: number,
+  totalVotes: number,
+): number {
+  if (totalVotes === 0) return 0;
+  return Math.round((votes / totalVotes) * 100);
 }

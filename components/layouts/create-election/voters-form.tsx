@@ -69,7 +69,7 @@ export function VotersForm({
     return (
       voter.name?.toLowerCase().includes(searchLower) ||
       voter.matricNumber?.toLowerCase().includes(searchLower) ||
-      voter.email?.toLowerCase().includes(searchLower) ||
+      voter.level?.toLowerCase().includes(searchLower) ||
       voter.department?.toLowerCase().includes(searchLower)
     );
   });
@@ -79,7 +79,7 @@ export function VotersForm({
       id: Date.now().toString(),
       name: "",
       matricNumber: "",
-      email: "",
+      level: "",
       department: "",
     });
     setEditingIndex(fields.length); // Set new voter to editing mode
@@ -128,7 +128,7 @@ export function VotersForm({
             id: Date.now().toString() + i,
             name: "",
             matricNumber: "",
-            email: "",
+            level: "",
             department: "",
           };
 
@@ -141,8 +141,8 @@ export function VotersForm({
               case "matricnumber":
                 voter.matricNumber = value;
                 break;
-              case "email":
-                voter.email = value;
+              case "level":
+                voter.level = value;
                 break;
               case "department":
                 voter.department = value;
@@ -204,8 +204,9 @@ export function VotersForm({
   };
 
   const downloadTemplate = () => {
+    // Update the CSV template:
     const csvContent =
-      "name,matricnumber,email,department\nJohn Doe,CS/2020/001,john@example.com,Computer Science\nJane Smith,EE/2020/002,jane@example.com,Electrical Engineering";
+      "name,matricnumber,level,department\nJohn Doe,CS/2020/001,400,Computer Science\nJane Smith,EE/2020/002,200,Electrical Engineering";
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -294,7 +295,7 @@ export function VotersForm({
                     <strong>Required columns:</strong> name, matricnumber
                   </li>
                   <li>
-                    <strong>Optional columns:</strong> email, department
+                    <strong>Optional columns:</strong> level, department
                   </li>
                   <li>Maximum 10,000 voters per upload</li>
                   <li>Matric numbers must be unique</li>
@@ -369,8 +370,8 @@ export function VotersForm({
                             Matric Number{" "}
                             <span className="text-red-400">*</span>
                           </th>
-                          <th className="text-left p-3 text-gray-100 dark:text-gray-300 font-medium min-w-[200px]">
-                            Email
+                          <th className="text-left p-3 text-gray-100 dark:text-gray-300 font-medium min-w-[150px]">
+                            Level <span className="text-red-400">*</span>
                           </th>
                           <th className="text-left p-3 text-gray-100 dark:text-gray-300 font-medium min-w-[150px]">
                             Department
@@ -459,26 +460,26 @@ export function VotersForm({
                               <td className="p-3">
                                 <Input
                                   className={`text-sm h-8 ${
-                                    errors.voters?.[actualIndex]?.email
+                                    errors.voters?.[actualIndex]?.level
                                       ? "border-red-500"
                                       : ""
                                   }`}
-                                  placeholder="Email (optional)"
-                                  type="email"
-                                  value={voter?.email || ""}
+                                  placeholder="Level (e.g., 100, 200, 300)"
+                                  type="text" // Change from "level" to "text"
+                                  value={voter?.level || ""}
                                   onChange={(e) =>
                                     handleCellEdit(
                                       actualIndex,
-                                      "email",
+                                      "level",
                                       e.target.value,
                                     )
                                   }
                                   onFocus={() => setEditingIndex(actualIndex)}
                                   onBlur={() => setEditingIndex(null)}
                                 />
-                                {errors.voters?.[actualIndex]?.email && (
+                                {errors.voters?.[actualIndex]?.level && (
                                   <p className="text-red-400 text-xs mt-1">
-                                    {errors.voters[actualIndex]?.email?.message}
+                                    {errors.voters[actualIndex]?.level?.message}
                                   </p>
                                 )}
                               </td>
