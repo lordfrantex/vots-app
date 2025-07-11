@@ -679,4 +679,19 @@ export const abi = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  {
+    inputs: [],
+    name: "VotsEngine__VoterNotAccredited",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "VotsEngine__ElectionNotActive",
+    type: "error",
+  },
+  {
+    inputs: [],
+    name: "VotsEngine__InvalidVoterDetails",
+    type: "error",
+  },
 ] as const;

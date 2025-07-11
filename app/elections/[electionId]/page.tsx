@@ -276,29 +276,31 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
         <ElectionCandidates electionId={electionId} />
         <ElectionInformation electionId={electionId} />
 
-        <div className="mt-12 space-y-6">
-          <Tabs
-            value={activeTab}
-            onValueChange={(val) => setActiveTab(val as any)}
-            className="hidden"
-          >
-            <TabsList>
-              <TabsTrigger value="REGISTERED">Registered</TabsTrigger>
-              <TabsTrigger value="ACCREDITED">Accredited</TabsTrigger>
-              <TabsTrigger value="VOTED">Voted</TabsTrigger>
-              <TabsTrigger value="UNACCREDITED">Unaccredited</TabsTrigger>
-            </TabsList>
-          </Tabs>
+        {election.status === "COMPLETED" && (
+          <div className="mt-12 space-y-6">
+            <Tabs
+              value={activeTab}
+              onValueChange={(val) => setActiveTab(val as any)}
+              className="hidden"
+            >
+              <TabsList>
+                <TabsTrigger value="REGISTERED">Registered</TabsTrigger>
+                <TabsTrigger value="ACCREDITED">Accredited</TabsTrigger>
+                <TabsTrigger value="VOTED">Voted</TabsTrigger>
+                <TabsTrigger value="UNACCREDITED">Unaccredited</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-          <VoterSearchFilter
-            voters={enhancedVoters}
-            onFilter={handleFilterChange}
-            onVoterSelect={handleVoterSelect}
-            showResults={true}
-            placeholder="Search voters by name, level, or department..."
-            className="h-fit"
-          />
-        </div>
+            <VoterSearchFilter
+              voters={enhancedVoters}
+              onFilter={handleFilterChange}
+              onVoterSelect={handleVoterSelect}
+              showResults={true}
+              placeholder="Search voters by name, level, or department..."
+              className="h-fit"
+            />
+          </div>
+        )}
 
         {/* Display selected voter */}
         {/*{selectedVoter && (*/}

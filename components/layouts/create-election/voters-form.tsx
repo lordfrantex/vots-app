@@ -175,25 +175,54 @@ export function VotersForm({
           return;
         }
 
-        if (voters.length > 10000) {
-          setCsvError("Maximum 10,000 voters allowed");
-          return;
-        }
+        // Get existing voters and check combined limit
+        const existingVoters = watchedVoters || [];
+        const totalVotersAfterImport = existingVoters.length + voters.length;
 
-        // Check for duplicate matric numbers
-        const matricNumbers = voters.map((v) => v.matricNumber.toLowerCase());
-        const duplicates = matricNumbers.filter(
-          (item, index) => matricNumbers.indexOf(item) !== index,
-        );
-        if (duplicates.length > 0) {
+        if (totalVotersAfterImport > 10000) {
           setCsvError(
-            `Duplicate matric numbers found: ${[...new Set(duplicates)].join(", ")}`,
+            `Total voters would exceed 10,000 limit. Currently have ${existingVoters.length} voters, trying to add ${voters.length} more.`,
           );
           return;
         }
 
-        replace(voters);
-        setCsvSuccess(`Successfully imported ${voters.length} voters`);
+        // Check for duplicate matric numbers within CSV
+        const csvMatricNumbers = voters.map((v) =>
+          v.matricNumber.toLowerCase(),
+        );
+        const csvDuplicates = csvMatricNumbers.filter(
+          (item, index) => csvMatricNumbers.indexOf(item) !== index,
+        );
+        if (csvDuplicates.length > 0) {
+          setCsvError(
+            `Duplicate matric numbers found in CSV: ${[...new Set(csvDuplicates)].join(", ")}`,
+          );
+          return;
+        }
+
+        // Check for duplicates between existing voters and CSV voters
+        const existingMatricNumbers = existingVoters.map((v) =>
+          v.matricNumber.toLowerCase(),
+        );
+        const conflictingMatricNumbers = voters.filter((voter) =>
+          existingMatricNumbers.includes(voter.matricNumber.toLowerCase()),
+        );
+
+        if (conflictingMatricNumbers.length > 0) {
+          setCsvError(
+            `The following matric numbers already exist: ${conflictingMatricNumbers.map((v) => v.matricNumber).join(", ")}`,
+          );
+          return;
+        }
+
+        // Append CSV voters to existing voters instead of replacing
+        voters.forEach((voter) => {
+          append(voter);
+        });
+
+        setCsvSuccess(
+          `Successfully imported ${voters.length} voters. Total voters: ${totalVotersAfterImport}`,
+        );
         setSearchTerm(""); // Clear search when new data is loaded
       } catch {
         setCsvError("Error parsing CSV file. Please check the format.");
@@ -202,7 +231,6 @@ export function VotersForm({
 
     reader.readAsText(file);
   };
-
   const downloadTemplate = () => {
     // Update the CSV template:
     const csvContent =

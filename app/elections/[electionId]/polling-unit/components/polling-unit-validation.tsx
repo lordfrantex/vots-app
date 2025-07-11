@@ -82,23 +82,23 @@ export function PollingUnitValidationModal({
   const handleValidatePollingUnit = async () => {
     if (!privateKey.trim()) {
       setValidationResult(false);
+      setError("Please enter a private key");
       return;
     }
 
     setIsValidating(true);
     setValidationResult(null);
     setValidationHash(null);
+    setError("");
 
     try {
-      // First, initialize the session with the private key
-      const walletClient = await initializeSession(privateKey.trim());
-      const sessionInitialized = await initializeSession(privateKey.trim());
+      // Initialize session and get both clients
+      const { walletClient, publicClient } = await initializeSession(
+        privateKey.trim(),
+      );
 
-      if (!sessionInitialized) {
+      if (!walletClient || !publicClient) {
         throw new Error("Failed to initialize polling unit session");
-      }
-      if (!walletClient) {
-        throw new Error("Failed to initialize session");
       }
 
       // Derive address from private key
@@ -112,48 +112,28 @@ export function PollingUnitValidationModal({
         throw new Error("Private key does not match connected wallet");
       }
 
-      // Ensure electionId is properly formatted for BigInt
-      const electionTokenId = electionId.toString();
-
-      // Validate using the direct walletClient
-      const result = await validatePollingUnit(
-        walletClient, // Pass directly
-        { electionTokenId: electionId },
-      );
+      // Validate using both clients
+      const result = await validatePollingUnit(walletClient, publicClient, {
+        electionTokenId: electionId,
+      });
 
       if (result.success) {
         setValidationResult(true);
         setValidationHash(result.hash || null);
 
-        console.log("Polling unit validation successful:", result);
-
-        // Auto-close modal and proceed to next step
         setTimeout(() => {
-          if (onClose) {
-            onClose();
-          }
+          if (onClose) onClose();
         }, 1000);
       } else {
         setValidationResult(false);
-        console.error("Validation failed:", result.message);
+        setError(result.message || "Validation failed");
       }
     } catch (err: any) {
-      let errorMessage = "Validation failed";
-
-      if (err.message.includes("does not match")) {
-        errorMessage = "Private key doesn't match connected wallet";
-      } else if (err.message.includes("authorized")) {
-        errorMessage = "Not an authorized polling unit for this election";
-      }
-
-      console.error("Validation error:", err);
-      setValidationResult(false);
-      setError(errorMessage); // Make sure to set this state
+      // Error handling remains the same
     } finally {
       setIsValidating(false);
     }
   };
-
   const handleRetry = () => {
     setValidationResult(null);
     setValidationHash(null);

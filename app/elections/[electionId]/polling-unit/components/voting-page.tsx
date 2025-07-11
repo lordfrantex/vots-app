@@ -26,6 +26,7 @@ import type { Candidate } from "@/types/candidate";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { useSessionVoteCandidates } from "@/hooks/use-session-vote-candidates";
+import ElectionCountdownTimer from "@/components/ui/election-countdown-timer";
 
 interface VotingPageProps {
   electionId: string;
@@ -60,8 +61,6 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
   // Use the consolidated hook for election details
   const { election, error } = useElectionDetails(electionId);
-  // Near the top of the VotingPage component
-  console.log("Election data:", election);
 
   // Voting hook - get the transaction states from the hook
   const {
@@ -365,18 +364,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                     Time Remaining
                   </span>
                 </div>
-                <div className="pl-6">
-                  <Badge
-                    variant="outline"
-                    className={`font-mono ${
-                      isVotingEnded
-                        ? "border-red-200 dark:border-red-500/50 text-red-700 dark:text-red-400"
-                        : "border-blue-200 dark:border-blue-500/50 text-blue-700 dark:text-blue-400"
-                    }`}
-                  >
-                    {timeRemaining}
-                  </Badge>
-                </div>
+                <ElectionCountdownTimer endDate={election.endDate} />
               </div>
 
               {/* Progress */}

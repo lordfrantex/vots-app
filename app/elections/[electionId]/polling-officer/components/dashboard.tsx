@@ -90,7 +90,7 @@ export function Dashboard({
   }, [election?.voters, accreditedSet, votedSet]);
 
   const totalVoters = enhancedVoters.length;
-  const accreditedCount = election?.accreditedVoters?.length || 0;
+  const accreditedCount = election?.accreditedVotersCount || 0;
   const votedCount = election?.votedVoters?.length || 0;
 
   const handleVoterSelect = useCallback((voter: EnhancedVoter) => {

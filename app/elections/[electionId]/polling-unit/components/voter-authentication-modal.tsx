@@ -293,11 +293,11 @@ const VoterAuthenticationModal = ({
               </div>
             )}
 
-            {authenticationResult?.error && (
+            {contractError && (
               <Alert className="bg-red-900/20 border-red-700/50">
                 <AlertTriangle className="h-4 w-4 text-red-400" />
                 <AlertDescription className="text-red-300">
-                  {authenticationResult.error}
+                  Voter authentication failed. Try again!
                 </AlertDescription>
               </Alert>
             )}

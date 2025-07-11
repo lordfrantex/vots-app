@@ -14,7 +14,7 @@ import {
   SUPPORTED_CHAINS,
 } from "@/contracts/election-address";
 import type { ContractElectionParams } from "@/utils/contract-helpers";
-import type { Address, WalletClient } from "viem";
+import type { Address, PublicClient, WalletClient } from "viem";
 import { Voter } from "@/types/voter";
 import { usePollingUnitSession } from "./use-polling-unit-session";
 import { sepolia } from "wagmi/chains";
@@ -566,16 +566,24 @@ export function useValidatePollingOfficer() {
 // Hook for validating polling units - UPDATED for chain-aware addresses
 export function useValidatePollingUnit() {
   const chainId = useChainId();
-  const { session } = usePollingUnitSession();
+  const { session, isInitializing } = usePollingUnitSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const validatePollingUnit = async (
     walletClient: WalletClient,
+    publicClient: PublicClient | null,
     params: ValidatePollingUnitParams,
   ): Promise<ValidatePollingUnitResult> => {
-    if (!session.isValid || !session.walletClient) {
-      const errorMsg = "No valid polling unit session";
+    if (isInitializing) {
+      return {
+        success: false,
+        message: "Session is initializing, please wait",
+      };
+    }
+
+    if (!walletClient || !publicClient) {
+      const errorMsg = "Wallet client not initialized";
       setError(errorMsg);
       return {
         success: false,
@@ -589,24 +597,21 @@ export function useValidatePollingUnit() {
     try {
       console.log("Validating polling unit with params:", params);
 
-      // Ensure electionTokenId is properly converted to BigInt
       const electionTokenIdBigInt = BigInt(params.electionTokenId);
 
-      // Submit the validation transaction
-      const hash = await session.walletClient.writeContract({
+      const hash = await walletClient.writeContract({
         address: getContractAddress(chainId),
         abi,
         functionName: "validateAddressAsPollingUnit",
         args: [electionTokenIdBigInt],
-        account: session.walletClient.account, // Add this line
+        account: walletClient.account,
       });
 
       console.log("Validation transaction submitted with hash:", hash);
 
-      // Wait for transaction confirmation
-      const receipt = await session.walletClient.waitForTransactionReceipt({
+      // Use publicClient to wait for receipt
+      const receipt = await publicClient.waitForTransactionReceipt({
         hash,
-        timeout: 60000, // 1 minute timeout
       });
 
       console.log("Validation transaction confirmed:", receipt);
@@ -622,9 +627,17 @@ export function useValidatePollingUnit() {
       }
     } catch (err: any) {
       console.error("Polling unit validation error:", err);
-      const errorMessage = err.message || "Failed to validate polling unit";
-      setError(errorMessage);
+      let errorMessage = "Failed to validate polling unit";
 
+      if (err.message.includes("Not authorized")) {
+        errorMessage = "Not authorized as polling unit for this election";
+      } else if (err.message.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds for gas fees";
+      } else if (err.message.includes("User rejected")) {
+        errorMessage = "Transaction rejected by user";
+      }
+
+      setError(errorMessage);
       return {
         success: false,
         message: errorMessage,

@@ -6,6 +6,8 @@ import {
   WalletClient,
   publicActions,
   Hex,
+  PublicClient,
+  createPublicClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { sepolia, avalancheFuji } from "viem/chains";
@@ -14,6 +16,7 @@ interface PollingUnitSession {
   privateKey: string;
   isValid: boolean;
   walletClient: WalletClient | null;
+  publicClient?: PublicClient | null;
 }
 
 export function usePollingUnitSession() {
@@ -22,6 +25,7 @@ export function usePollingUnitSession() {
     isValid: false,
     walletClient: null,
   });
+  const [isInitializing, setIsInitializing] = useState(false);
 
   // Initialize session from sessionStorage on mount
   useEffect(() => {
@@ -40,47 +44,52 @@ export function usePollingUnitSession() {
   }, []);
 
   const initializeSession = async (privateKey: string) => {
+    setIsInitializing(true);
     try {
-      // Clean the private key (remove 0x prefix if present, then add it back)
-      const cleanPrivateKey = privateKey.replace("0x", "");
-      const formattedPrivateKey = `0x${cleanPrivateKey}`;
+      const cleanPrivateKey = privateKey.trim().replace("0x", "");
+      if (!cleanPrivateKey) {
+        throw new Error("Empty private key");
+      }
 
-      // Create account from private key
+      const formattedPrivateKey = `0x${cleanPrivateKey}`;
       const account = privateKeyToAccount(<Hex>formattedPrivateKey);
 
-      // Initialize wallet client with public actions for transaction receipts
-      const client = createWalletClient({
+      // Create both wallet client and public client
+      const walletClient = createWalletClient({
         account,
-        chain: sepolia, // Explicitly specify chain
+        chain: sepolia,
         transport: http(),
-      }).extend(publicActions);
+      });
+
+      const publicClient = createPublicClient({
+        chain: sepolia,
+        transport: http(),
+      });
 
       // Store session
       const sessionData = {
         privateKey: formattedPrivateKey,
         isValid: true,
-        walletClient: client,
+        walletClient,
+        publicClient, // Add public client to session
       };
 
       setSession(sessionData);
-
-      if (sessionStorage.getItem("pollingUnitSession")) {
-        sessionStorage.removeItem("pollingUnitSession");
-      }
       sessionStorage.setItem(
         "pollingUnitSession",
         JSON.stringify({ privateKey: formattedPrivateKey }),
       );
 
       console.log("Polling unit session initialized successfully");
-      return client;
+      return { walletClient, publicClient };
     } catch (error) {
       console.error("Failed to initialize polling unit session:", error);
       clearSession();
-      return null;
+      throw error;
+    } finally {
+      setIsInitializing(false);
     }
   };
-
   const clearSession = () => {
     setSession({
       privateKey: "",
@@ -99,5 +108,6 @@ export function usePollingUnitSession() {
     initializeSession,
     clearSession,
     isSessionValid,
+    isInitializing,
   };
 }

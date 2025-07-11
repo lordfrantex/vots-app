@@ -23,7 +23,7 @@ const ElectionCountdownTimer: React.FC<CountdownTimerProps> = ({
   onTimeEnd,
   className,
   showLabel = true,
-  customLabel = "Election closes in",
+  customLabel = "",
   size = "md",
 }) => {
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining>({
@@ -142,7 +142,9 @@ const ElectionCountdownTimer: React.FC<CountdownTimerProps> = ({
   return (
     <div className={cn("text-center", sizeClasses.container, className)}>
       {showLabel && (
-        <p className={cn("text-muted-foreground text-end", sizeClasses.label)}>
+        <p
+          className={cn("text-muted-foreground text-center", sizeClasses.label)}
+        >
           {customLabel}
         </p>
       )}
