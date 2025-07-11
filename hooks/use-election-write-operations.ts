@@ -14,7 +14,7 @@ import {
   SUPPORTED_CHAINS,
 } from "@/contracts/election-address";
 import type { ContractElectionParams } from "@/utils/contract-helpers";
-import type { Address } from "viem";
+import type { Address, WalletClient } from "viem";
 import { Voter } from "@/types/voter";
 import { usePollingUnitSession } from "./use-polling-unit-session";
 import { sepolia } from "wagmi/chains";
@@ -571,6 +571,7 @@ export function useValidatePollingUnit() {
   const [error, setError] = useState<string | null>(null);
 
   const validatePollingUnit = async (
+    walletClient: WalletClient,
     params: ValidatePollingUnitParams,
   ): Promise<ValidatePollingUnitResult> => {
     if (!session.isValid || !session.walletClient) {

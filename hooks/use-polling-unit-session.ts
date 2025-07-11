@@ -64,20 +64,20 @@ export function usePollingUnitSession() {
 
       setSession(sessionData);
 
-      // Only store the private key in sessionStorage (not the wallet client)
+      if (sessionStorage.getItem("pollingUnitSession")) {
+        sessionStorage.removeItem("pollingUnitSession");
+      }
       sessionStorage.setItem(
         "pollingUnitSession",
-        JSON.stringify({
-          privateKey: formattedPrivateKey,
-        }),
+        JSON.stringify({ privateKey: formattedPrivateKey }),
       );
 
       console.log("Polling unit session initialized successfully");
-      return true;
+      return client;
     } catch (error) {
       console.error("Failed to initialize polling unit session:", error);
       clearSession();
-      return false;
+      return null;
     }
   };
 

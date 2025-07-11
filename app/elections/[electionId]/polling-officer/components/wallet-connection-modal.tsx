@@ -275,16 +275,6 @@ export function WalletConnectionModal({
                 </Alert>
               )}
 
-              {/* Error Display */}
-              {error && (
-                <Alert className="bg-red-500/10 border-red-500/20">
-                  <AlertCircle className="h-4 w-4 text-red-400" />
-                  <AlertDescription className="text-red-400">
-                    {error}
-                  </AlertDescription>
-                </Alert>
-              )}
-
               {/* Validate Button */}
               {validationResult === null && !validationHash && (
                 <Button

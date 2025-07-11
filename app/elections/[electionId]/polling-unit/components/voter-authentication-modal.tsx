@@ -47,7 +47,7 @@ const VoterAuthenticationModal = ({
   onBack,
 }: VoterAuthenticationModalProps) => {
   const [matricNumber, setMatricNumber] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [surname, setSurname] = useState("");
   const [authenticationResult, setAuthenticationResult] = useState<{
     success: boolean;
     voter?: {
@@ -86,14 +86,14 @@ const VoterAuthenticationModal = ({
       setAuthenticationResult({
         success: true,
         voter: {
-          name: fullName,
+          name: surname,
           matricNumber: matricNumber,
           isAccredited: true,
           hasVoted: false,
         },
       });
     }
-  }, [isValidationSuccess, validationHash, fullName, matricNumber]);
+  }, [isValidationSuccess, validationHash, surname, matricNumber]);
 
   // Handle contract errors
   useEffect(() => {
@@ -124,7 +124,7 @@ const VoterAuthenticationModal = ({
   }, [contractError]);
 
   const handleAuthenticate = async () => {
-    if (!matricNumber.trim() || !fullName.trim()) {
+    if (!matricNumber.trim() || !surname.trim()) {
       setAuthenticationResult({
         success: false,
         error: "Please enter both your name and matriculation number.",
@@ -138,13 +138,13 @@ const VoterAuthenticationModal = ({
     try {
       console.log("Validating voter for voting:", {
         matricNumber: matricNumber.trim(),
-        fullName: fullName.trim(),
+        surname: surname.trim(),
         electionTokenId: electionTokenId.toString(),
       });
 
       // Call the blockchain validation function with CORRECT parameter names
       const result = await validateVoterForVoting({
-        voterName: fullName.trim(),
+        voterName: surname.trim(),
         voterMatricNo: matricNumber.trim(),
         electionTokenId: electionTokenId,
       });
@@ -178,10 +178,10 @@ const VoterAuthenticationModal = ({
 
   // Reset authentication result when form is cleared
   useEffect(() => {
-    if (!matricNumber.trim() && !fullName.trim()) {
+    if (!matricNumber.trim() && !surname.trim()) {
       setAuthenticationResult(null);
     }
-  }, [matricNumber, fullName]);
+  }, [matricNumber, surname]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -253,19 +253,19 @@ const VoterAuthenticationModal = ({
 
             <div className="space-y-2">
               <Label
-                htmlFor="fullName"
+                htmlFor="surname"
                 className="text-slate-700 dark:text-slate-300"
               >
-                Full Name
+                Surname
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  id="fullName"
+                  id="surname"
                   type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your surname only"
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
                   className="pl-10 bg-slate-300/20 dark:bg-slate-800/50 dark:border-slate-600 placeholder-slate-400"
                   disabled={isProcessing}
                 />
@@ -315,7 +315,7 @@ const VoterAuthenticationModal = ({
               <Button
                 onClick={handleAuthenticate}
                 disabled={
-                  !matricNumber.trim() || !fullName.trim() || isProcessing
+                  !matricNumber.trim() || !surname.trim() || isProcessing
                 }
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               >

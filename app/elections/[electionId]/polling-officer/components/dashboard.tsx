@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useElectionDetails } from "@/hooks/use-contract-address";
 import { useAccreditVoter } from "@/hooks/use-election-write-operations";
 import { DashboardHeader } from "./dashboard-header";
@@ -14,6 +14,10 @@ import {
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import VoterSearchFilter from "@/components/ui/voter-search-filter";
+import { Separator } from "@/components/ui/separator";
+import { EnhancedVoter } from "@/types/voter";
 
 interface DashboardProps {
   electionId: string;
@@ -21,11 +25,18 @@ interface DashboardProps {
   onBackToValidation?: () => void;
 }
 
+// Enhanced voter interface for better compatibility
+
 export function Dashboard({
   electionId,
   officerWallet,
   onBackToValidation,
 }: DashboardProps) {
+  const [filteredVoters, setFilteredVoters] = useState<EnhancedVoter[]>([]);
+  const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
+    null,
+  );
+
   // Fetch election data
   const {
     election,
@@ -33,6 +44,17 @@ export function Dashboard({
     error: electionError,
     refetch,
   } = useElectionDetails(electionId);
+
+  // Extract pollRoleName for the current officer
+  const pollRoleName = useMemo(() => {
+    return (
+      election?.pollingOfficers.find(
+        (officer) => officer.address?.pollAddress === officerWallet,
+      )?.address?.pollRoleName || "Unknown Role"
+    );
+  }, [election?.pollingOfficers, officerWallet]);
+
+  const queryClient = useQueryClient();
 
   // Accreditation hook
   const {
@@ -44,77 +66,66 @@ export function Dashboard({
     hash: txHash,
   } = useAccreditVoter();
 
-  // Convert election voters to polling officer view
-  const pollingOfficerVoters = useMemo(() => {
+  // Convert election voters to enhanced format
+  const enhancedVoters = useMemo(() => {
     if (!election?.voters) return [];
 
-    // Convert from standard Voter interface to PollingOfficerVoterView
-    return election.voters.map((voter) => {
-      // For now, we'll use the matricNumber as both masked and full
-      // In a real implementation, you'd have off-chain data mapping
-      const fullMatricNumber = voter.matricNumber; // This should come from secure off-chain storage
-
+    return election.voters.map((voter): EnhancedVoter => {
       return {
         id: voter.id,
         name: voter.name,
-        maskedMatricNumber: voter.matricNumber, // Already masked in the data
-        fullMatricNumber, // From off-chain data
-        photo: "/placeholder-user.jpg",
+        matricNumber: voter.matricNumber,
+        level: voter.level ? Number(voter.level) : undefined,
+        department: voter.department || undefined,
         isAccredited: voter.isAccredited || false,
         hasVoted: voter.hasVoted || false,
+        photo: "/placeholder-user.jpg",
         accreditedAt: voter.isAccredited ? new Date().toISOString() : undefined,
         votedAt: voter.hasVoted ? new Date().toISOString() : undefined,
       };
     });
   }, [election?.voters]);
 
+  // Handle voter selection from search filter
+  const handleVoterSelect = useCallback((voter: EnhancedVoter) => {
+    setSelectedVoter(voter);
+  }, []);
+
+  // Handle filter changes
+  const handleFilterChange = useCallback((filtered: EnhancedVoter[]) => {
+    setFilteredVoters(filtered);
+  }, []);
   // Handle voter accreditation
-  const handleAccreditVoter = useCallback(
-    async (
-      matricNumber: string,
-    ): Promise<{ success: boolean; message: string; txHash?: string }> => {
-      console.log("=== HANDLE ACCREDIT VOTER ===");
-      console.log("Matric Number:", matricNumber);
-      console.log("Officer Wallet:", officerWallet);
+  const handleAccreditVoter = async (voterMatricNo: string) => {
+    if (!electionId) {
+      console.error("Election ID is not defined");
+      return { success: false, message: "Election ID is required" };
+    }
 
-      try {
-        const result = await accreditVoter({
-          voterMatricNo: matricNumber,
-          electionTokenId: BigInt(electionId),
+    try {
+      const electionTokenId = BigInt(electionId);
+      const result = await accreditVoter({ voterMatricNo, electionTokenId });
+
+      if (result.success) {
+        console.log("Voter accredited successfully:", result.message);
+        queryClient.invalidateQueries({
+          queryKey: [`electionVoters`, String(electionTokenId)],
         });
-
-        console.log("Accreditation result:", result);
-
-        if (result.success) {
-          // Refetch election data after successful transaction confirmation
-          setTimeout(() => {
-            console.log("Refetching election data...");
-            refetch();
-          }, 5000); // Wait 5 seconds for blockchain confirmation
-        }
-
-        return {
-          success: result.success,
-          message: result.message,
-        };
-      } catch (error) {
-        console.error("Error accrediting voter:", error);
-        return {
-          success: false,
-          message:
-            error instanceof Error ? error.message : "Failed to accredit voter",
-        };
+      } else {
+        console.error("Accreditation failed:", result.message);
       }
-    },
-    [accreditVoter, electionId, refetch, officerWallet],
-  );
+
+      return result;
+    } catch (error) {
+      console.error("Error during voter accreditation:", error);
+      return { success: false, message: "An unexpected error occurred" };
+    }
+  };
 
   // Calculate stats for header
-  const totalVoters = pollingOfficerVoters.length;
-  const accreditedCount = pollingOfficerVoters.filter(
-    (v) => v.isAccredited,
-  ).length;
-  const votedCount = pollingOfficerVoters.filter((v) => v.hasVoted).length;
+  const totalVoters = enhancedVoters.length;
+  const accreditedCount = election?.accreditedVoters || 0;
+  const votedCount = election?.totalVotes || 0;
 
   // Loading state
   if (isLoadingElection) {
@@ -166,11 +177,14 @@ export function Dashboard({
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto px-4 py-6 pb-12 space-y-6">
         {/* Top Navigation Bar */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col items-start space-y-2">
             <h1 className="text-2xl font-bold">Polling Officer Dashboard</h1>
+            <div className="text-sm text-slate-500 font-medium">
+              Officer: {pollRoleName}
+            </div>
             <div className="text-sm text-slate-400">
               Connected: {officerWallet.slice(0, 6)}...{officerWallet.slice(-4)}
             </div>
@@ -196,21 +210,21 @@ export function Dashboard({
         />
 
         {/* Officer Information Alert */}
-        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700 max-w-6xl mx-auto">
-          <Shield className="h-4 w-4" />
-          <AlertDescription className="text-blue-900 dark:text-blue-300">
-            <strong>Polling Officer:</strong> {officerWallet}
-            <br />
-            <span className="text-sm text-blue-900 dark:text-blue-300">
-              All accreditation transactions will be signed with this wallet
-              address.
-            </span>
-          </AlertDescription>
-        </Alert>
+        {/*<Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700">*/}
+        {/*  <Shield className="h-4 w-4" />*/}
+        {/*  <AlertDescription className="text-blue-900 dark:text-blue-300">*/}
+        {/*    <strong>Polling Officer:</strong> {officerWallet}*/}
+        {/*    <br />*/}
+        {/*    <span className="text-sm text-blue-900 dark:text-blue-300">*/}
+        {/*      All accreditation transactions will be signed with this wallet*/}
+        {/*      address.*/}
+        {/*    </span>*/}
+        {/*  </AlertDescription>*/}
+        {/*</Alert>*/}
 
         {/* Accreditation Error Alert */}
         {accreditationError && (
-          <Alert className="bg-red-900/20 border-red-700  max-w-6xl mx-auto">
+          <Alert className="bg-red-900/20 border-red-700 max-w-6xl mx-auto">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-red-300">
               <strong>Accreditation Error:</strong> Voter is already accredited
@@ -220,23 +234,31 @@ export function Dashboard({
         )}
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12">
           {/* Accreditation Panel */}
-          <div className="space-y-6">
-            <InputAccreditationPanel
-              onAccredit={handleAccreditVoter}
-              isAccrediting={isAccrediting}
-              isConfirming={isConfirming}
-              isSuccess={accreditationSuccess}
-              txHash={txHash}
-              electionId={electionId}
-              voters={election.voters.map((voter) => ({
-                matricNumber: voter.matricNumber,
-                isAccredited: voter.isAccredited || false,
-                name: voter.name,
-              }))}
-            />
-          </div>
+          <InputAccreditationPanel
+            onAccredit={handleAccreditVoter}
+            isAccrediting={isAccrediting}
+            isConfirming={isConfirming}
+            isSuccess={accreditationSuccess}
+            txHash={txHash}
+            electionId={electionId}
+            voters={election.voters.map((voter) => ({
+              matricNumber: voter.matricNumber,
+              isAccredited: voter.isAccredited || false,
+              name: voter.name,
+            }))}
+          />
+
+          <VoterSearchFilter
+            voters={enhancedVoters}
+            onFilter={handleFilterChange}
+            onVoterSelect={handleVoterSelect}
+            showResults={true}
+            placeholder="Search voters by name, level, or department..."
+            className="h-fit"
+            electionStatus="ACTIVE"
+          />
         </div>
       </div>
     </div>

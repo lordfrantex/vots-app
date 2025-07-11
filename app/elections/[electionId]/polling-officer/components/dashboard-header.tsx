@@ -6,6 +6,7 @@ import { Users, CheckCircle, TrendingUp, Calendar, Clock } from "lucide-react";
 import Heading from "@/components/ui/heading";
 import type { Election } from "@/types/election";
 import { formatDate } from "@/lib/utils";
+import ElectionCountdownTimer from "@/components/ui/election-countdown-timer";
 
 interface DashboardHeaderProps {
   election: Election;
@@ -25,17 +26,6 @@ export function DashboardHeader({
     totalVoters > 0 ? Math.round((accreditedCount / totalVoters) * 100) : 0;
   const turnoutPercentage =
     accreditedCount > 0 ? Math.round((votedCount / accreditedCount) * 100) : 0;
-
-  // // Format dates
-  // const formatDate = (dateString: string) => {
-  //   return new Date(dateString).toLocaleDateString("en-US", {
-  //     year: "numeric",
-  //     month: "short",
-  //     day: "numeric",
-  //     hour: "2-digit",
-  //     minute: "2-digit",
-  //   });
-  // };
 
   // Get status color
   const getStatusColor = (status: string) => {
@@ -73,9 +63,12 @@ export function DashboardHeader({
                 </div>
               </div>
             </div>
-            <Badge className={getStatusColor(election.status)}>
-              {election.status}
-            </Badge>
+            <div className="flex flex-col items-end space-y-4">
+              <Badge className={getStatusColor(election.status)}>
+                {election.status}
+              </Badge>
+              <ElectionCountdownTimer endDate={election.endDate} />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

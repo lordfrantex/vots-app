@@ -91,11 +91,16 @@ export function PollingUnitValidationModal({
 
     try {
       // First, initialize the session with the private key
+      const walletClient = await initializeSession(privateKey.trim());
       const sessionInitialized = await initializeSession(privateKey.trim());
 
       if (!sessionInitialized) {
         throw new Error("Failed to initialize polling unit session");
       }
+      if (!walletClient) {
+        throw new Error("Failed to initialize session");
+      }
+
       // Derive address from private key
       const cleanPrivateKey = privateKey.trim().replace("0x", "");
       const formattedPrivateKey = `0x${cleanPrivateKey}`;
@@ -110,10 +115,11 @@ export function PollingUnitValidationModal({
       // Ensure electionId is properly formatted for BigInt
       const electionTokenId = electionId.toString();
 
-      // Validate polling unit with contract
-      const result = await validatePollingUnit({
-        electionTokenId: electionTokenId,
-      });
+      // Validate using the direct walletClient
+      const result = await validatePollingUnit(
+        walletClient, // Pass directly
+        { electionTokenId: electionId },
+      );
 
       if (result.success) {
         setValidationResult(true);

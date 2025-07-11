@@ -28,3 +28,16 @@ export interface VoterCredentials {
   email?: string;
   department?: string;
 }
+
+export interface EnhancedVoter {
+  id: string;
+  name: string;
+  matricNumber: string;
+  level?: number;
+  department?: string;
+  isAccredited?: boolean;
+  hasVoted?: boolean;
+  photo?: string;
+  accreditedAt?: string;
+  votedAt?: string;
+}

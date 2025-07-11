@@ -1,7 +1,7 @@
 "use client";
 
 import { useAccount, useReadContract, useReadContracts } from "wagmi";
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { abi } from "@/contracts/abi";
 import { electionAddress } from "@/contracts/election-address";
 import type { Election } from "@/types/election";
@@ -94,11 +94,54 @@ export function useContractAddress(chainId?: number) {
   );
 }
 
-// Main hook: get all elections
-export const useContractElections = (preferredChainId?: number) => {
+// Custom hook for interval-based refetching
+const usePolling = (
+  refetch: () => void,
+  interval: number = 10000,
+  enabled: boolean = true,
+) => {
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const startPolling = () => {
+      intervalRef.current = setInterval(() => {
+        refetch();
+      }, interval);
+    };
+
+    startPolling();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [refetch, interval, enabled]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+};
+
+// Main hook: get all elections with auto-refetch
+export const useContractElections = (
+  preferredChainId?: number,
+  pollingConfig?: { enabled?: boolean; interval?: number },
+) => {
   const { chain } = useAccount();
   const targetChainId = preferredChainId || chain?.id || sepolia.id;
   const contractAddress = useContractAddress(targetChainId);
+
+  // Polling configuration
+  const pollingEnabled = pollingConfig?.enabled ?? true;
+  const pollingInterval = pollingConfig?.interval ?? 10000; // Default 10 seconds
 
   // Get all elections summary
   const {
@@ -188,9 +231,20 @@ export const useContractElections = (preferredChainId?: number) => {
     data: detailsData,
     isLoading: isLoadingDetails,
     error: detailsError,
+    refetch: refetchDetails,
   } = useReadContracts({
     contracts: detailContracts,
   });
+
+  // Combined refetch function
+  const refetch = useMemo(() => {
+    return async () => {
+      await Promise.all([refetchSummary(), refetchDetails()]);
+    };
+  }, [refetchSummary, refetchDetails]);
+
+  // Set up polling
+  usePolling(refetch, pollingInterval, pollingEnabled);
 
   // Transform and combine all data
   const elections = useMemo(() => {
@@ -335,28 +389,36 @@ export const useContractElections = (preferredChainId?: number) => {
     elections,
     isLoading,
     error,
-    refetch: refetchSummary,
+    refetch,
   };
 };
 
-// Hook for getting a single election with full details
+// Hook for getting a single election with full details and auto-refetch
 export const useElectionDetails = (
   electionId: string | null,
   preferredChainId?: number,
+  pollingConfig?: { enabled?: boolean; interval?: number },
 ) => {
   const { chain } = useAccount();
   const targetChainId = preferredChainId || chain?.id || sepolia.id;
   const contractAddress = useContractAddress(targetChainId);
 
+  // Polling configuration
+  const pollingEnabled = pollingConfig?.enabled ?? true;
+  const pollingInterval = pollingConfig?.interval ?? 10000; // Default 10 seconds
+
   // First, get basic election info to determine status
-  const { data: electionBasicInfo, isLoading: isLoadingBasicInfo } =
-    useReadContract({
-      abi,
-      address: contractAddress,
-      functionName: "getElectionInfo",
-      args: electionId ? [BigInt(electionId)] : undefined,
-      chainId: targetChainId,
-    });
+  const {
+    data: electionBasicInfo,
+    isLoading: isLoadingBasicInfo,
+    refetch: refetchBasicInfo,
+  } = useReadContract({
+    abi,
+    address: contractAddress,
+    functionName: "getElectionInfo",
+    args: electionId ? [BigInt(electionId)] : undefined,
+    chainId: targetChainId,
+  });
 
   // Determine election status from basic info
   const electionStatus = useMemo(() => {
@@ -423,10 +485,20 @@ export const useElectionDetails = (
     data: contractData,
     isLoading: isLoadingDetails,
     error,
-    refetch,
+    refetch: refetchContractData,
   } = useReadContracts({
     contracts,
   });
+
+  // Combined refetch function
+  const refetch = useMemo(() => {
+    return async () => {
+      await Promise.all([refetchBasicInfo(), refetchContractData()]);
+    };
+  }, [refetchBasicInfo, refetchContractData]);
+
+  // Set up polling
+  usePolling(refetch, pollingInterval, pollingEnabled);
 
   const election = useMemo(() => {
     if (!contractData || !electionId || !electionStatus) return null;
