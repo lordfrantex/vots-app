@@ -6,18 +6,12 @@ import { useAccreditVoter } from "@/hooks/use-election-write-operations";
 import { DashboardHeader } from "./dashboard-header";
 import { InputAccreditationPanel } from "./search-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Shield,
-  RefreshCw,
-  AlertTriangle,
-  ArrowLeft,
-  LogOut,
-} from "lucide-react";
+import { RefreshCw, AlertTriangle, ArrowLeft, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import VoterSearchFilter from "@/components/ui/voter-search-filter";
-import { Separator } from "@/components/ui/separator";
 import { EnhancedVoter } from "@/types/voter";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DashboardProps {
   electionId: string;
@@ -25,19 +19,19 @@ interface DashboardProps {
   onBackToValidation?: () => void;
 }
 
-// Enhanced voter interface for better compatibility
-
 export function Dashboard({
   electionId,
   officerWallet,
   onBackToValidation,
 }: DashboardProps) {
-  const [filteredVoters, setFilteredVoters] = useState<EnhancedVoter[]>([]);
   const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
     null,
   );
+  const [filteredVoters, setFilteredVoters] = useState<EnhancedVoter[]>([]);
+  const [activeTab, setActiveTab] = useState<
+    "REGISTERED" | "ACCREDITED" | "VOTED" | "UNACCREDITED"
+  >("REGISTERED");
 
-  // Fetch election data
   const {
     election,
     isLoading: isLoadingElection,
@@ -45,18 +39,8 @@ export function Dashboard({
     refetch,
   } = useElectionDetails(electionId);
 
-  // Extract pollRoleName for the current officer
-  const pollRoleName = useMemo(() => {
-    return (
-      election?.pollingOfficers.find(
-        (officer) => officer.address?.pollAddress === officerWallet,
-      )?.address?.pollRoleName || "Unknown Role"
-    );
-  }, [election?.pollingOfficers, officerWallet]);
-
   const queryClient = useQueryClient();
 
-  // Accreditation hook
   const {
     accreditVoter,
     isLoading: isAccrediting,
@@ -66,68 +50,89 @@ export function Dashboard({
     hash: txHash,
   } = useAccreditVoter();
 
-  // Convert election voters to enhanced format
-  const enhancedVoters = useMemo(() => {
-    if (!election?.voters) return [];
+  const pollRoleName = useMemo(() => {
+    return (
+      election?.pollingOfficers.find(
+        (officer) => officer.address?.pollAddress === officerWallet,
+      )?.address?.pollRoleName || "Unknown Role"
+    );
+  }, [election?.pollingOfficers, officerWallet]);
 
-    return election.voters.map((voter): EnhancedVoter => {
+  // Create ID Sets
+  const accreditedSet = useMemo(() => {
+    return new Set(election?.accreditedVoters?.map((v) => v.id));
+  }, [election?.accreditedVoters]);
+
+  const votedSet = useMemo(() => {
+    return new Set(election?.votedVoters?.map((v) => v.id));
+  }, [election?.votedVoters]);
+
+  // Enhance all voters
+  const enhancedVoters: EnhancedVoter[] = useMemo(() => {
+    if (!election?.voters) return [];
+    return election.voters.map((voter) => {
+      const isAccredited = accreditedSet.has(voter.id);
+      const hasVoted = votedSet.has(voter.id);
       return {
         id: voter.id,
         name: voter.name,
         matricNumber: voter.matricNumber,
         level: voter.level ? Number(voter.level) : undefined,
         department: voter.department || undefined,
-        isAccredited: voter.isAccredited || false,
-        hasVoted: voter.hasVoted || false,
+        isRegistered: true,
+        isAccredited,
+        hasVoted,
         photo: "/placeholder-user.jpg",
-        accreditedAt: voter.isAccredited ? new Date().toISOString() : undefined,
-        votedAt: voter.hasVoted ? new Date().toISOString() : undefined,
+        accreditedAt: isAccredited ? new Date().toISOString() : undefined,
+        votedAt: hasVoted ? new Date().toISOString() : undefined,
       };
     });
-  }, [election?.voters]);
+  }, [election?.voters, accreditedSet, votedSet]);
 
-  // Handle voter selection from search filter
+  const totalVoters = enhancedVoters.length;
+  const accreditedCount = election?.accreditedVoters?.length || 0;
+  const votedCount = election?.votedVoters?.length || 0;
+
   const handleVoterSelect = useCallback((voter: EnhancedVoter) => {
     setSelectedVoter(voter);
   }, []);
 
-  // Handle filter changes
   const handleFilterChange = useCallback((filtered: EnhancedVoter[]) => {
     setFilteredVoters(filtered);
   }, []);
-  // Handle voter accreditation
-  const handleAccreditVoter = async (voterMatricNo: string) => {
-    if (!electionId) {
-      console.error("Election ID is not defined");
-      return { success: false, message: "Election ID is required" };
-    }
 
+  const handleAccreditVoter = async (voterMatricNo: string) => {
+    if (!electionId)
+      return { success: false, message: "Election ID is required" };
     try {
       const electionTokenId = BigInt(electionId);
       const result = await accreditVoter({ voterMatricNo, electionTokenId });
-
       if (result.success) {
-        console.log("Voter accredited successfully:", result.message);
         queryClient.invalidateQueries({
           queryKey: [`electionVoters`, String(electionTokenId)],
         });
-      } else {
-        console.error("Accreditation failed:", result.message);
       }
-
       return result;
     } catch (error) {
-      console.error("Error during voter accreditation:", error);
+      console.error("Accreditation error:", error);
       return { success: false, message: "An unexpected error occurred" };
     }
   };
 
-  // Calculate stats for header
-  const totalVoters = enhancedVoters.length;
-  const accreditedCount = election?.accreditedVoters || 0;
-  const votedCount = election?.totalVotes || 0;
+  // Derive voters by tab
+  const displayedVoters = useMemo(() => {
+    switch (activeTab) {
+      case "ACCREDITED":
+        return enhancedVoters.filter((v) => v.isAccredited);
+      case "VOTED":
+        return enhancedVoters.filter((v) => v.hasVoted);
+      case "UNACCREDITED":
+        return enhancedVoters.filter((v) => !v.isAccredited && v.isRegistered);
+      default:
+        return enhancedVoters;
+    }
+  }, [activeTab, enhancedVoters]);
 
-  // Loading state
   if (isLoadingElection) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -142,7 +147,6 @@ export function Dashboard({
     );
   }
 
-  // Error state
   if (electionError || !election) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -178,7 +182,7 @@ export function Dashboard({
   return (
     <div className="min-h-screen">
       <div className="container mx-auto px-4 py-6 pb-12 space-y-6">
-        {/* Top Navigation Bar */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex flex-col items-start space-y-2">
             <h1 className="text-2xl font-bold">Polling Officer Dashboard</h1>
@@ -201,7 +205,6 @@ export function Dashboard({
           )}
         </div>
 
-        {/* Header with correct props */}
         <DashboardHeader
           election={election}
           totalVoters={totalVoters}
@@ -209,20 +212,6 @@ export function Dashboard({
           votedCount={votedCount}
         />
 
-        {/* Officer Information Alert */}
-        {/*<Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700">*/}
-        {/*  <Shield className="h-4 w-4" />*/}
-        {/*  <AlertDescription className="text-blue-900 dark:text-blue-300">*/}
-        {/*    <strong>Polling Officer:</strong> {officerWallet}*/}
-        {/*    <br />*/}
-        {/*    <span className="text-sm text-blue-900 dark:text-blue-300">*/}
-        {/*      All accreditation transactions will be signed with this wallet*/}
-        {/*      address.*/}
-        {/*    </span>*/}
-        {/*  </AlertDescription>*/}
-        {/*</Alert>*/}
-
-        {/* Accreditation Error Alert */}
         {accreditationError && (
           <Alert className="bg-red-900/20 border-red-700 max-w-6xl mx-auto">
             <AlertTriangle className="h-4 w-4" />
@@ -233,9 +222,20 @@ export function Dashboard({
           </Alert>
         )}
 
-        {/* Main Content */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(val) => setActiveTab(val as any)}
+          className="mb-4"
+        >
+          <TabsList>
+            <TabsTrigger value="REGISTERED">Registered</TabsTrigger>
+            <TabsTrigger value="ACCREDITED">Accredited</TabsTrigger>
+            <TabsTrigger value="VOTED">Voted</TabsTrigger>
+            <TabsTrigger value="UNACCREDITED">Unaccredited</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12">
-          {/* Accreditation Panel */}
           <InputAccreditationPanel
             onAccredit={handleAccreditVoter}
             isAccrediting={isAccrediting}
@@ -243,23 +243,48 @@ export function Dashboard({
             isSuccess={accreditationSuccess}
             txHash={txHash}
             electionId={electionId}
-            voters={election.voters.map((voter) => ({
-              matricNumber: voter.matricNumber,
-              isAccredited: voter.isAccredited || false,
-              name: voter.name,
+            voters={enhancedVoters.map((v) => ({
+              name: v.name,
+              matricNumber: v.matricNumber,
+              isAccredited: v.isAccredited,
             }))}
           />
 
           <VoterSearchFilter
-            voters={enhancedVoters}
+            voters={displayedVoters}
             onFilter={handleFilterChange}
             onVoterSelect={handleVoterSelect}
             showResults={true}
             placeholder="Search voters by name, level, or department..."
             className="h-fit"
-            electionStatus="ACTIVE"
+            electionStatus={election.status}
           />
         </div>
+
+        {selectedVoter && (
+          <div className="mt-6 max-w-2xl border rounded-md bg-slate-50 dark:bg-slate-800 p-4 shadow-sm">
+            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+              Selected Voter
+            </h4>
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+              <strong>Name:</strong> {selectedVoter.name}
+              <br />
+              <strong>Matric:</strong> {selectedVoter.matricNumber}
+              <br />
+              {selectedVoter.level && (
+                <>
+                  <strong>Level:</strong> {selectedVoter.level}
+                  <br />
+                </>
+              )}
+              {selectedVoter.department && (
+                <>
+                  <strong>Department:</strong> {selectedVoter.department}
+                </>
+              )}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

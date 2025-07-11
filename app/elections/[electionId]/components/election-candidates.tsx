@@ -51,10 +51,6 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
     {} as Record<string, ContractCandidateInfoDTO[]>,
   );
 
-  // Debug logging to check candidates data
-  console.log("Election candidates:", candidates);
-  console.log("Candidates by category:", candidatesByCategory);
-
   const isSingleCandidateCategory = (category: string) => {
     return candidatesByCategory[category]?.length === 1;
   };

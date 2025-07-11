@@ -1,4 +1,5 @@
 export interface Voter {
+  voterState?: number;
   id: string;
   name: string;
   matricNumber: string; // For polling officers, this will be masked like "CSC/25/****"
@@ -30,6 +31,7 @@ export interface VoterCredentials {
 }
 
 export interface EnhancedVoter {
+  isRegistered: boolean;
   id: string;
   name: string;
   matricNumber: string;
@@ -40,4 +42,5 @@ export interface EnhancedVoter {
   photo?: string;
   accreditedAt?: string;
   votedAt?: string;
+  voterState?: number;
 }

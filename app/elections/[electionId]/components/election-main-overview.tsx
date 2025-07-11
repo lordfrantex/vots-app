@@ -74,7 +74,7 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
         />
         <StatCard
           title="Accredited Voters"
-          value={(election?.accreditedVoters ?? 0).toLocaleString()}
+          value={(election?.accreditedVotersCount ?? 0).toLocaleString()}
           icon={<FaCheck />}
         />
         <StatCard

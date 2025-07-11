@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useMemo } from "react";
-import { use, useEffect, useCallback, useRef } from "react";
+import React, {
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+  useState,
+  use,
+} from "react";
 import ElectionMain from "@/app/elections/[electionId]/components/election-main";
 import ElectionCandidates from "@/app/elections/[electionId]/components/election-candidates";
 import ElectionInformation from "@/app/elections/[electionId]/components/election-information";
@@ -9,6 +15,7 @@ import { useElectionStore } from "@/store/use-election";
 import { useElectionDetails } from "@/hooks/use-contract-address";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import VoterSearchFilter from "@/components/ui/voter-search-filter";
 import { EnhancedVoter } from "@/types/voter";
 
@@ -19,15 +26,16 @@ interface ElectionPageProps {
 }
 
 const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
-  // Unwrap the params Promise using React.use()
+  const [activeTab, setActiveTab] = useState<
+    "REGISTERED" | "ACCREDITED" | "VOTED" | "UNACCREDITED"
+  >("REGISTERED");
+
   const { electionId } = use(params);
 
-  // Get election from store (might be empty on page reload)
   const { getElectionById, setCurrentElection, addElection } =
     useElectionStore();
   const storeElection = getElectionById(electionId);
 
-  // Fetch election details from contract (this will always work, even on page reload)
   const {
     election: contractElection,
     isLoading: contractLoading,
@@ -35,14 +43,11 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     refetch,
   } = useElectionDetails(electionId);
 
-  // Refs to track timers and prevent multiple intervals
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoRefreshedRef = useRef(false);
 
-  // Calculate time until next status change
   const getTimeUntilStatusChange = useCallback((election: any) => {
     if (!election) return null;
-
     const now = Date.now();
     const startTime = new Date(election.startDate).getTime();
     const endTime = new Date(election.endDate).getTime();
@@ -56,25 +61,21 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     return null;
   }, []);
 
-  // Auto-refresh function
   const handleAutoRefresh = useCallback(async () => {
-    console.log("Auto-refreshing election data due to status change...");
     hasAutoRefreshedRef.current = true;
 
     try {
       await refetch();
-      // Perform a full page refresh
       window.location.reload();
     } catch (error) {
       console.error("Error during auto-refresh:", error);
     }
   }, [refetch]);
-  // Set up status change monitoring
+
   useEffect(() => {
     const election = storeElection || contractElection;
     if (!election || contractLoading) return;
 
-    // Clear any existing interval
     if (statusCheckIntervalRef.current) {
       clearInterval(statusCheckIntervalRef.current);
       statusCheckIntervalRef.current = null;
@@ -82,30 +83,20 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
 
     const timeUntilChange = getTimeUntilStatusChange(election);
 
-    // Only set up monitoring for UPCOMING or ACTIVE elections
     if (timeUntilChange !== null && timeUntilChange > 0) {
-      console.log(
-        `Election status will change in ${Math.ceil(timeUntilChange / 1000)} seconds`,
-      );
-
-      // Set up interval to check status every 30 seconds as we approach the change
-      const checkInterval = timeUntilChange > 300000 ? 60000 : 30000; // 1 min if >5 min away, otherwise 30 sec
+      const checkInterval = timeUntilChange > 300000 ? 60000 : 30000;
 
       statusCheckIntervalRef.current = setInterval(() => {
         const currentTimeUntilChange = getTimeUntilStatusChange(election);
-
         if (currentTimeUntilChange !== null && currentTimeUntilChange <= 0) {
-          // Status should have changed, trigger refresh
           handleAutoRefresh();
         }
       }, checkInterval);
 
-      // Also set a timeout for the exact moment of change (with small buffer)
       const exactTimeout = setTimeout(() => {
         handleAutoRefresh();
-      }, timeUntilChange + 5000); // 5 second buffer
+      }, timeUntilChange + 5000);
 
-      // Cleanup timeout on unmount
       return () => {
         clearTimeout(exactTimeout);
         if (statusCheckIntervalRef.current) {
@@ -115,7 +106,6 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
       };
     }
 
-    // Cleanup interval on dependency change
     return () => {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current);
@@ -130,17 +120,14 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     handleAutoRefresh,
   ]);
 
-  // Update store when contract data is loaded
   useEffect(() => {
     if (contractElection && (!storeElection || hasAutoRefreshedRef.current)) {
-      // Add to store if not already there or if this is an auto-refresh
       addElection(contractElection);
       setCurrentElection(contractElection);
-      hasAutoRefreshedRef.current = false; // Reset flag
+      hasAutoRefreshedRef.current = false;
     }
   }, [contractElection, storeElection, addElection, setCurrentElection]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (statusCheckIntervalRef.current) {
@@ -150,59 +137,81 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     };
   }, []);
 
-  // Determine which election data to use
   const election = storeElection || contractElection;
   const isLoading = contractLoading && !storeElection;
   const error = contractError;
 
-  // Convert election voters to enhanced format
-  const enhancedVoters = useMemo(() => {
+  console.log("Election Data:", election);
+
+  const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
 
-    return election.voters.map((voter): EnhancedVoter => {
+    const accreditedIds = new Set(
+      election.accreditedVoters?.map((v) => v.id) || [],
+    );
+    const votedIds = new Set(
+      election.voters?.filter((v) => v.hasVoted).map((v) => v.id) || [],
+    );
+
+    return election.voters.map((voter) => {
+      const isAccredited = accreditedIds.has(voter.id);
+      const hasVoted = votedIds.has(voter.id);
       return {
         id: voter.id,
         name: voter.name,
         matricNumber: voter.matricNumber,
+        department: voter.department,
         level: voter.level ? Number(voter.level) : undefined,
-        department: voter.department || undefined,
-        isAccredited: voter.isAccredited || false,
-        hasVoted: voter.hasVoted || false,
+        isAccredited,
+        hasVoted,
+        isRegistered: true,
         photo: "/placeholder-user.jpg",
-        accreditedAt: voter.isAccredited ? new Date().toISOString() : undefined,
-        votedAt: voter.hasVoted ? new Date().toISOString() : undefined,
+        accreditedAt: isAccredited ? new Date().toISOString() : undefined,
+        votedAt: hasVoted ? new Date().toISOString() : undefined,
       };
     });
-  }, [election?.voters]);
+  }, [election?.voters, election?.accreditedVoters]);
 
-  // Handle voter selection from search filter
+  console.log("Enhanced Voters:", enhancedVoters);
+
+  const tabFilteredVoters = useMemo(() => {
+    switch (activeTab) {
+      case "ACCREDITED":
+        return enhancedVoters.filter((v) => v.isAccredited);
+      case "VOTED":
+        return enhancedVoters.filter((v) => v.hasVoted);
+      case "UNACCREDITED":
+        return enhancedVoters.filter((v) => !v.isAccredited);
+      default:
+        return enhancedVoters;
+    }
+  }, [activeTab, enhancedVoters]);
+
+  const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
+    null,
+  );
+  const [filteredVoters, setFilteredVoters] = useState<EnhancedVoter[]>([]);
+
   const handleVoterSelect = useCallback((voter: EnhancedVoter) => {
     setSelectedVoter(voter);
   }, []);
 
-  // Handle filter changes
   const handleFilterChange = useCallback((filtered: EnhancedVoter[]) => {
     setFilteredVoters(filtered);
   }, []);
 
-  // Manual refresh function for error cases
   const handleManualRefresh = useCallback(async () => {
     try {
       await refetch();
     } catch (error) {
       console.error("Manual refresh failed:", error);
-      // Fallback to page reload if refetch fails
       window.location.reload();
     }
   }, [refetch]);
 
-  // Show loading state while fetching from contract (and no cached data)
   if (isLoading) {
     return (
-      <section
-        id="election-page"
-        className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20"
-      >
+      <section className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20">
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="flex flex-col items-center gap-4">
@@ -217,13 +226,9 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     );
   }
 
-  // Show error state with retry option
   if (error && !election) {
     return (
-      <section
-        id="election-page"
-        className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20"
-      >
+      <section className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20">
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center space-y-4">
@@ -241,13 +246,9 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     );
   }
 
-  // Show not found only after loading is complete and no election exists
   if (!isLoading && !election) {
     return (
-      <section
-        id="election-page"
-        className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20"
-      >
+      <section className="justify-center items-center min-h-screen relative pt-[7rem] lg:pt-[10rem] -mt-20">
         <div className="max-w-[1400px] mx-auto">
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center space-y-4">
@@ -265,25 +266,65 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     );
   }
 
-  // Render the election page
   return (
     <section
       id="election-page"
-      className="justify-center items-center min-h-screen relative pt-[10rem] -mt-20  mb-[10rem]"
+      className="justify-center items-center min-h-screen relative pt-[10rem] -mt-20 mb-[10rem]"
     >
       <div className="max-w-[1400px] mx-auto">
         <ElectionMain electionId={electionId} />
         <ElectionCandidates electionId={electionId} />
         <ElectionInformation electionId={electionId} />
-        <VoterSearchFilter
-          voters={enhancedVoters}
-          onFilter={handleFilterChange}
-          onVoterSelect={handleVoterSelect}
-          showResults={true}
-          placeholder="Search voters by name, level, or department..."
-          className="h-fit"
-          electionStatus="ACTIVE"
-        />
+
+        <div className="mt-12 space-y-6">
+          <Tabs
+            value={activeTab}
+            onValueChange={(val) => setActiveTab(val as any)}
+            className="hidden"
+          >
+            <TabsList>
+              <TabsTrigger value="REGISTERED">Registered</TabsTrigger>
+              <TabsTrigger value="ACCREDITED">Accredited</TabsTrigger>
+              <TabsTrigger value="VOTED">Voted</TabsTrigger>
+              <TabsTrigger value="UNACCREDITED">Unaccredited</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <VoterSearchFilter
+            voters={enhancedVoters}
+            onFilter={handleFilterChange}
+            onVoterSelect={handleVoterSelect}
+            showResults={true}
+            placeholder="Search voters by name, level, or department..."
+            className="h-fit"
+          />
+        </div>
+
+        {/* Display selected voter */}
+        {/*{selectedVoter && (*/}
+        {/*  <div className="mt-8 p-4 border rounded-md bg-slate-50 dark:bg-slate-800 shadow-sm">*/}
+        {/*    <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">*/}
+        {/*      Selected Voter*/}
+        {/*    </h4>*/}
+        {/*    <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">*/}
+        {/*      <strong>Name:</strong> {selectedVoter.name}*/}
+        {/*      <br />*/}
+        {/*      <strong>Matric:</strong> {selectedVoter.matricNumber}*/}
+        {/*      <br />*/}
+        {/*      {selectedVoter.level && (*/}
+        {/*        <>*/}
+        {/*          <strong>Level:</strong> {selectedVoter.level}*/}
+        {/*          <br />*/}
+        {/*        </>*/}
+        {/*      )}*/}
+        {/*      {selectedVoter.department && (*/}
+        {/*        <>*/}
+        {/*          <strong>Department:</strong> {selectedVoter.department}*/}
+        {/*        </>*/}
+        {/*      )}*/}
+        {/*    </p>*/}
+        {/*  </div>*/}
+        {/*)}*/}
       </div>
     </section>
   );

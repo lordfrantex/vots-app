@@ -1,5 +1,14 @@
-import React, { useState, useMemo, useCallback } from "react";
-import { Search, Filter, X, Users, UserCheck, Vote } from "lucide-react";
+// components/ui/voter-search-filter.tsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Search,
+  Filter,
+  X,
+  Users,
+  UserCheck,
+  Vote,
+  XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,34 +20,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-// Enhanced Voter interface that matches your existing structure
-interface Voter {
-  id: string;
-  name: string;
-  matricNumber: string;
-  level?: number;
-  department?: string;
-  isAccredited?: boolean;
-  hasVoted?: boolean;
-  // Additional fields for compatibility
-  photo?: string;
-  accreditedAt?: string;
-  votedAt?: string;
-}
+import { useVoterFilter } from "@/hooks/use-voter-filter";
+import { EnhancedVoter } from "@/types/voter";
 
 // Status type for better type safety
-type VoterStatus = "registered" | "accredited" | "voted";
+export type VoterStatus =
+  | "registered"
+  | "accredited"
+  | "voted"
+  | "unaccredited";
 
 interface VoterSearchFilterProps {
-  voters?: Voter[];
-  onFilter?: (filteredVoters: Voter[]) => void;
-  onVoterSelect?: (voter: Voter) => void;
+  voters?: EnhancedVoter[];
+  onFilter?: (filteredVoters: EnhancedVoter[]) => void;
+  onVoterSelect?: (voter: EnhancedVoter) => void;
   showResults?: boolean;
   placeholder?: string;
   className?: string;
   compact?: boolean;
-  electionStatus?: "ACTIVE" | "COMPLETED" | "UPCOMING"; // Add election status prop
+  availableStatuses?: VoterStatus[];
+  showLevelFilter?: boolean;
+  showDepartmentFilter?: boolean;
+  defaultSelectedStatus?: VoterStatus;
+  electionStatus?: string;
 }
 
 const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
@@ -49,107 +53,43 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
   placeholder = "Search by name, level, or department...",
   className = "",
   compact = false,
-  electionStatus = "UPCOMING", // Default to UPCOMING
+  availableStatuses = ["registered", "accredited", "voted", "unaccredited"],
+  showLevelFilter = true,
+  showDepartmentFilter = true,
+  defaultSelectedStatus = "registered",
+  electionStatus,
 }) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStatus, setSelectedStatus] =
-    useState<VoterStatus>("registered"); // Default to registered
-  const [selectedLevel, setSelectedLevel] = useState<string>("all");
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
+  const {
+    searchTerm,
+    setSearchTerm,
+    selectedStatus,
+    setSelectedStatus,
+    selectedLevel,
+    setSelectedLevel,
+    selectedDepartment,
+    setSelectedDepartment,
+    filteredVoters,
+    statusCounts,
+    levels,
+    departments,
+    clearFilters,
+    getVoterStatus,
+  } = useVoterFilter(voters);
+
   const [showFilters, setShowFilters] = useState(false);
 
-  // Helper function to get voter status
-  const getVoterStatus = (voter: Voter): VoterStatus => {
-    if (voter.hasVoted) return "voted";
-    if (voter.isAccredited) return "accredited";
-    return "registered";
-  };
-
-  // Get unique levels and departments for filter options
-  const { levels, departments } = useMemo(() => {
-    const uniqueLevels = [
-      ...new Set(voters.map((v) => v.level).filter(Boolean)),
-    ].sort();
-    const uniqueDepartments = [
-      ...new Set(voters.map((v) => v.department).filter(Boolean)),
-    ].sort();
-    return {
-      levels: uniqueLevels,
-      departments: uniqueDepartments,
-    };
-  }, [voters]);
-
-  // Filter voters based on search and filter criteria
-  const filteredVoters = useMemo(() => {
-    return voters.filter((voter) => {
-      // Search term matching
-      const matchesSearch =
-        !searchTerm ||
-        voter.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        voter.matricNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        voter.level?.toString().includes(searchTerm) ||
-        voter.department?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      // Status filter
-      const voterStatus = getVoterStatus(voter);
-      const matchesStatus = voterStatus === selectedStatus;
-
-      // Level filter
-      const matchesLevel =
-        selectedLevel === "all" || voter.level?.toString() === selectedLevel;
-
-      // Department filter
-      const matchesDepartment =
-        selectedDepartment === "all" || voter.department === selectedDepartment;
-
-      return (
-        matchesSearch && matchesStatus && matchesLevel && matchesDepartment
-      );
-    });
-  }, [voters, searchTerm, selectedStatus, selectedLevel, selectedDepartment]);
-
-  // Trigger callback whenever filters change
-  React.useEffect(() => {
+  // Notify parent about filtered voters
+  useEffect(() => {
     onFilter?.(filteredVoters);
   }, [filteredVoters, onFilter]);
 
-  // Clear all filters
-  const clearFilters = useCallback(() => {
-    setSearchTerm("");
-    setSelectedStatus("registered"); // Reset to registered instead of "all"
-    setSelectedLevel("all");
-    setSelectedDepartment("all");
-  }, []);
-
-  // Handle voter selection
-  const handleVoterSelect = (voter: Voter) => {
-    onVoterSelect?.(voter);
-  };
-
-  // Status counts for display
-  const statusCounts = useMemo(() => {
-    const counts = {
-      registered: 0,
-      accredited: 0,
-      voted: 0,
-      total: voters.length,
-    };
-
-    voters.forEach((voter) => {
-      const status = getVoterStatus(voter);
-      counts[status]++;
-    });
-
-    return counts;
-  }, [voters]);
-
-  // Status button configuration - filter based on election status
+  // Status button configuration - filter based on available statuses
   const statusButtons = useMemo(() => {
     const allButtons = [
       {
         key: "registered" as VoterStatus,
         label: "Registered",
-        count: statusCounts.registered,
+        count: statusCounts.total,
         icon: Users,
       },
       {
@@ -164,6 +104,12 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
         count: statusCounts.voted,
         icon: Vote,
       },
+      {
+        key: "unaccredited" as VoterStatus,
+        label: "Unaccredited",
+        count: statusCounts.unaccredited,
+        icon: XCircle,
+      },
     ];
 
     // If election is ACTIVE, only show registered voters
@@ -174,6 +120,14 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
     // If election is COMPLETED or UPCOMING, show all status buttons
     return allButtons;
   }, [statusCounts, electionStatus]);
+
+  // Handle voter selection
+  const handleVoterSelect = useCallback(
+    (voter: EnhancedVoter) => {
+      onVoterSelect?.(voter);
+    },
+    [onVoterSelect],
+  );
 
   return (
     <Card
@@ -188,15 +142,17 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
               Voter Search & Filter
             </CardTitle>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            {showFilters ? "Hide" : "Show"} Filters
-          </Button>
+          {(showLevelFilter || showDepartmentFilter) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFilters(!showFilters)}
+              className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              {showFilters ? "Hide" : "Show"} Filters
+            </Button>
+          )}
         </div>
       </CardHeader>
 
@@ -224,43 +180,45 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
         </div>
 
         {/* Status Filter Buttons */}
-        <div
-          className={`flex ${compact ? "flex-wrap" : "flex-col sm:flex-row"} gap-2`}
-        >
-          {statusButtons.map(({ key, label, count, icon: Icon }) => (
-            <Button
-              key={key}
-              variant={selectedStatus === key ? "default" : "outline"}
-              size="sm"
-              onClick={() => setSelectedStatus(key)}
-              className={`flex items-center gap-2 cursor-pointer ${
-                selectedStatus === key
-                  ? "bg-[#233D8A] hover:bg-[#233D8A]/80 text-white border-[#233D8A]"
-                  : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 bg-white dark:bg-slate-800"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{label}</span>
-              <Badge
-                variant="secondary"
-                className={`ml-1 ${
+        {statusButtons.length > 0 && (
+          <div
+            className={`flex ${compact ? "flex-wrap" : "flex-col sm:flex-row"} gap-2`}
+          >
+            {statusButtons.map(({ key, label, count, icon: Icon }) => (
+              <Button
+                key={key}
+                variant={selectedStatus === key ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedStatus(key)}
+                className={`flex items-center gap-2 cursor-pointer ${
                   selectedStatus === key
-                    ? "bg-white/20 text-white hover:bg-white/30"
-                    : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                    ? "bg-[#233D8A] hover:bg-[#233D8A]/80 text-white border-[#233D8A]"
+                    : "border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 bg-white dark:bg-slate-800"
                 }`}
               >
-                {count}
-              </Badge>
-            </Button>
-          ))}
-        </div>
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+                <Badge
+                  variant="secondary"
+                  className={`ml-1 ${
+                    selectedStatus === key
+                      ? "bg-white/20 text-white hover:bg-white/30"
+                      : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
+                  }`}
+                >
+                  {count}
+                </Badge>
+              </Button>
+            ))}
+          </div>
+        )}
 
         {/* Advanced Filters */}
-        {showFilters && (
+        {showFilters && (showLevelFilter || showDepartmentFilter) && (
           <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Level Filter */}
-              {levels.length > 0 && (
+              {showLevelFilter && levels.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Level
@@ -294,7 +252,7 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
               )}
 
               {/* Department Filter */}
-              {departments.length > 0 && (
+              {showDepartmentFilter && departments.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Department
@@ -389,10 +347,12 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
                       }
                       className={
                         voter.hasVoted
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 capitalize"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-800/10 capitalize"
                           : voter.isAccredited
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 capitalize"
-                            : "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200 capitalize"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-800/10 capitalize"
+                            : !voter.isAccredited
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-800/10 capitalize"
+                              : "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-800/10 capitalize"
                       }
                     >
                       {getVoterStatus(voter)}
@@ -400,11 +360,6 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
                   </div>
                 </div>
               ))}
-              {/*{filteredVoters.length > 10 && (*/}
-              {/*  <div className="p-3 text-center text-sm text-slate-500 dark:text-slate-400">*/}
-              {/*    And {filteredVoters.length - 10} more voters...*/}
-              {/*  </div>*/}
-              {/*)}*/}
             </div>
           </div>
         )}

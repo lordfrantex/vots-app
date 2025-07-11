@@ -173,7 +173,7 @@ export const useContractElections = (
     });
   }, [electionsData]);
 
-  // Prepare contracts for batch reading with conditional candidate fetching
+  // Prepare contracts for batch reading with conditional candidate and accredited voters fetching
   const detailContracts = useMemo(() => {
     if (!electionMetadata.length) return [];
     return electionMetadata.flatMap(({ electionId, status }) => {
@@ -211,12 +211,28 @@ export const useContractElections = (
           args: [electionId],
           chainId: targetChainId,
         });
+        // NEW: Add getAllAccreditedVoters for completed elections
+        baseContracts.push({
+          abi,
+          address: contractAddress,
+          functionName: "getAllAccreditedVoters",
+          args: [electionId],
+          chainId: targetChainId,
+        });
       } else {
         // For upcoming/active elections, use getAllCandidatesInDto
         baseContracts.push({
           abi,
           address: contractAddress,
           functionName: "getAllCandidatesInDto",
+          args: [electionId],
+          chainId: targetChainId,
+        });
+        // Add placeholder for accredited voters to maintain array structure
+        baseContracts.push({
+          abi,
+          address: contractAddress,
+          functionName: "getAllCandidatesInDto", // Placeholder - won't be used
           args: [electionId],
           chainId: targetChainId,
         });
@@ -252,26 +268,28 @@ export const useContractElections = (
 
     const details = detailsData as Array<{ result?: unknown; error?: Error }>;
 
-    console.log("=== CONTRACT DATA DEBUG ===");
-    console.log("Election Metadata:", electionMetadata);
-    console.log("Details results:", details);
+    // console.log("=== CONTRACT DATA DEBUG ===");
+    // console.log("Election Metadata:", electionMetadata);
+    // console.log("Details results:", details);
 
     return electionMetadata.map((meta, index) => {
       const { summary, status } = meta;
-      const baseIndex = index * 4; // 4 contracts per election
+      const baseIndex = index * 5; // Now 5 contracts per election (added accredited voters)
 
       // Get individual results with error checking
       const electionInfoResult = details[baseIndex];
       const allVotersResult = details[baseIndex + 1];
       const electionStatsResult = details[baseIndex + 2];
       const candidatesResult = details[baseIndex + 3]; // This will be either getAllCandidates or getAllCandidatesInDto
+      const accreditedVotersResult = details[baseIndex + 4]; // NEW: Accredited voters (only for completed elections)
 
-      console.log(
-        `\n--- Election ${index} (ID: ${summary.electionId}, Status: ${status}) ---`,
-      );
-      console.log("Election Info Result:", electionInfoResult);
-      console.log("All Voters Result:", allVotersResult);
-      console.log("Candidates Result:", candidatesResult);
+      // console.log(
+      //   `\n--- Election ${index} (ID: ${summary.electionId}, Status: ${status}) ---`,
+      // );
+      // console.log("Election Info Result:", electionInfoResult);
+      // console.log("All Voters Result:", allVotersResult);
+      // console.log("Candidates Result:", candidatesResult);
+      // console.log("Accredited Voters Result:", accreditedVotersResult);
 
       // Check for errors
       if (electionInfoResult?.error) {
@@ -283,6 +301,9 @@ export const useContractElections = (
       if (candidatesResult?.error) {
         console.error("Candidates Error:", candidatesResult.error);
       }
+      if (accreditedVotersResult?.error && status === "COMPLETED") {
+        console.error("Accredited Voters Error:", accreditedVotersResult.error);
+      }
 
       const electionInfo = electionInfoResult?.result as any;
       const allVotersData = allVotersResult?.result as
@@ -291,12 +312,21 @@ export const useContractElections = (
       const candidatesData = candidatesResult?.result as
         | ContractCandidateInfoDTO[]
         | undefined;
+      // NEW: Get accredited voters data only for completed elections
+      const accreditedVotersData =
+        status === "COMPLETED"
+          ? (accreditedVotersResult?.result as
+              | ContractElectionVoterResponse[]
+              | undefined)
+          : undefined;
 
-      console.log("Parsed Election Info:", electionInfo);
-      console.log("Parsed Voters Data:", allVotersData);
-      console.log("Parsed Candidates Data:", candidatesData);
-      console.log("Voters Array Length:", allVotersData?.length || 0);
-      console.log("Candidates Array Length:", candidatesData?.length || 0);
+      // console.log("Parsed Election Info:", electionInfo);
+      // console.log("Parsed Voters Data:", allVotersData);
+      // console.log("Parsed Candidates Data:", candidatesData);
+      // console.log("Parsed Accredited Voters Data:", accreditedVotersData);
+      // console.log("Voters Array Length:", allVotersData?.length || 0);
+      // console.log("Candidates Array Length:", candidatesData?.length || 0);
+      // console.log("Accredited Voters Array Length:", accreditedVotersData?.length || 0);
 
       // Categories
       const categories: Category[] = (
@@ -309,22 +339,25 @@ export const useContractElections = (
       // Candidates - process the data from whichever function was called
       const candidates: Candidate[] = (candidatesData ?? []).map(
         (candidate, idx) => {
-          console.log(
-            `Processing candidate ${idx} (Status: ${status}):`,
-            candidate,
-          );
           return convertCandidateFromContract(candidate, idx);
         },
       );
 
       // Voters - with more detailed logging
       const voters: Voter[] = (allVotersData ?? []).map((voter, idx) => {
-        console.log(`Processing voter ${idx}:`, voter);
         return convertVoterFromContract(voter, idx);
       });
 
-      console.log("Final processed candidates:", candidates);
-      console.log("Final processed voters:", voters);
+      // NEW: Accredited Voters - only for completed elections
+      const accreditedVoters: Voter[] = (accreditedVotersData ?? []).map(
+        (voter, idx) => {
+          return convertVoterFromContract(voter, idx);
+        },
+      );
+
+      // console.log("Final processed candidates:", candidates);
+      // console.log("Final processed voters:", voters);
+      // console.log("Final processed accredited voters:", accreditedVoters);
 
       // Polling Officers
       const pollingOfficers: PollingOfficer[] = (
@@ -362,9 +395,11 @@ export const useContractElections = (
         categories,
         totalVoters: Number(summary.registeredVotersCount ?? 0),
         totalVotes: Number(summary.votedVotersCount ?? 0),
-        accreditedVoters: Number(summary.accreditedVotersCount ?? 0),
+        accreditedVotersCount: Number(summary.accreditedVotersCount ?? 0),
         candidates,
         voters,
+        // NEW: Add accredited voters array to election object
+        accreditedVoters: status === "COMPLETED" ? accreditedVoters : [],
         pollingOfficers,
         pollingUnits,
         createdBy: electionInfo?.createdBy,
@@ -374,9 +409,10 @@ export const useContractElections = (
         metadata: {},
       };
 
-      console.log("Final election object:", election);
-      console.log("Final candidates count:", election.candidates.length);
-      console.log("Final voters count:", election.voters.length);
+      // console.log("Final election object:", election);
+      // console.log("Final candidates count:", election.candidates.length);
+      // console.log("Final voters count:", election.voters.length);
+      // console.log("Final accredited voters count:", election.accreditedVoters?.length || 0);
 
       return election;
     });
@@ -468,6 +504,14 @@ export const useElectionDetails = (
         args: [id],
         chainId: targetChainId,
       });
+      // NEW: Add getAllAccreditedVoters for completed elections
+      baseContracts.push({
+        abi,
+        address: contractAddress,
+        functionName: "getAllAccreditedVoters",
+        args: [id],
+        chainId: targetChainId,
+      });
     } else {
       baseContracts.push({
         abi,
@@ -502,11 +546,19 @@ export const useElectionDetails = (
 
   const election = useMemo(() => {
     if (!contractData || !electionId || !electionStatus) return null;
+
+    // Handle different array lengths based on election status
+    const isCompleted = electionStatus === "COMPLETED";
+    const expectedLength = isCompleted ? 5 : 4;
+
+    if (contractData.length < expectedLength) return null;
+
     const [
       electionInfoResult,
       allVotersResult,
       _electionStatsResult,
       candidatesResult,
+      accreditedVotersResult, // This will be undefined for non-completed elections
     ] = contractData as Array<{ result?: unknown; error?: Error }>;
 
     const electionInfo = electionInfoResult?.result as any;
@@ -516,11 +568,19 @@ export const useElectionDetails = (
     const candidatesData = candidatesResult?.result as
       | ContractCandidateInfoDTO[]
       | undefined;
+    // NEW: Get accredited voters data only for completed elections
+    const accreditedVotersData =
+      isCompleted && accreditedVotersResult
+        ? (accreditedVotersResult?.result as
+            | ContractElectionVoterResponse[]
+            | undefined)
+        : undefined;
 
     console.log(`Single Election Detail (Status: ${electionStatus}):`, {
       electionInfo,
       allVotersData,
       candidatesData,
+      accreditedVotersData,
     });
 
     // Categories
@@ -539,6 +599,11 @@ export const useElectionDetails = (
     // Voters
     const voters: Voter[] = (allVotersData || []).map((voter, idx) =>
       convertVoterFromContract(voter, idx),
+    );
+
+    // NEW: Accredited Voters - only for completed elections
+    const accreditedVoters: Voter[] = (accreditedVotersData || []).map(
+      (voter, idx) => convertVoterFromContract(voter, idx),
     );
 
     // Polling Officers
@@ -576,9 +641,11 @@ export const useElectionDetails = (
       categories,
       totalVoters: Number(electionInfo.registeredVotersCount),
       totalVotes: Number(electionInfo.votedVotersCount),
-      accreditedVoters: Number(electionInfo.accreditedVotersCount),
+      accreditedVotersCount: Number(electionInfo.accreditedVotersCount),
       candidates,
       voters,
+      // NEW: Add accredited voters array to election object
+      accreditedVoters: isCompleted ? accreditedVoters : [],
       pollingOfficers,
       pollingUnits,
       createdBy: electionInfo?.createdBy,
