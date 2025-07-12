@@ -27,6 +27,7 @@ import Image from "next/image";
 import toast from "react-hot-toast";
 import { useSessionVoteCandidates } from "@/hooks/use-session-vote-candidates";
 import ElectionCountdownTimer from "@/components/ui/election-countdown-timer";
+import { FaUser } from "react-icons/fa6";
 
 interface VotingPageProps {
   electionId: string;
@@ -58,6 +59,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const [votingEnded, setVotingEnded] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   // Use the consolidated hook for election details
   const { election, error } = useElectionDetails(electionId);
@@ -97,21 +99,36 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
       ? (selectedCategories.length / categories.length) * 100
       : 0;
 
-  // Handle success state - similar to create-election page
+  // Handle early navigation when transaction starts confirming
   useEffect(() => {
-    if (isSuccess) {
+    if (isConfirming && !showSuccessMessage) {
+      setShowSuccessMessage(true);
+      toast.success("Vote submitted successfully!");
+
+      // Navigate back immediately when confirmation starts
+      setTimeout(() => {
+        onBack();
+      }, 2000); // Short delay to show success message
+    }
+  }, [isConfirming, showSuccessMessage, onBack]);
+
+  // Handle final success state (for logging purposes, user already navigated)
+  useEffect(() => {
+    if (isSuccess && !showSuccessMessage) {
+      // This will only run if isSuccess happens before isConfirming
       setIsConfirmed(true);
       toast.success("Vote submitted successfully!");
       setTimeout(() => {
         onBack();
-      }, 3000);
+      }, 2000);
     }
-  }, [isSuccess, onBack]);
+  }, [isSuccess, showSuccessMessage, onBack]);
 
   // Handle contract errors
   useEffect(() => {
     if (votingError) {
       toast.error("Failed to submit vote");
+      setIsSubmitting(false);
     }
   }, [votingError]);
 
@@ -179,7 +196,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     }));
   };
 
-  // Simplified submit handler - similar to create-election page
+  // Modified submit handler with early navigation logic
   const handleSubmitVote = async () => {
     if (selectedCategories.length !== categories.length || votingEnded) {
       return;
@@ -216,17 +233,19 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
       if (!result.success) {
         toast.error("Failed to submit vote");
+        setIsSubmitting(false);
       }
+      // Note: We don't set isSubmitting to false here because the useEffect
+      // for isConfirming will handle navigation
     } catch (error) {
       console.error("Error in vote submission:", error);
       toast.error("Unexpected error occurred");
-    } finally {
       setIsSubmitting(false);
-      console.log("=== VOTE SUBMISSION END ===");
     }
+    console.log("=== VOTE SUBMISSION END ===");
   };
 
-  const isLoading = isSubmitting || isCreating || isConfirming;
+  const isLoading = isSubmitting || isCreating;
 
   // Loading state
   if (isLoading && !election) {
@@ -263,8 +282,8 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   // Check if voting has ended based on election status
   const isVotingEnded = election.status === "COMPLETED" || votingEnded;
 
-  // Vote submitted success state
-  if (isConfirmed) {
+  // Vote submitted success state (shown while transaction is confirming)
+  if (showSuccessMessage || isConfirmed) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-6">
@@ -276,7 +295,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
               Vote Submitted Successfully!
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              Your vote has been recorded on the blockchain.
+              Your vote is being processed on the blockchain.
             </p>
             {hash && (
               <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
@@ -284,7 +303,9 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
               </p>
             )}
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Redirecting you back to the authentication page...
+              {isConfirming
+                ? "Processing in background. Redirecting you back..."
+                : "Redirecting you back to the authentication page..."}
             </p>
           </div>
           <div className="flex items-center justify-center space-x-2">
@@ -343,16 +364,31 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                     Voter Information
                   </span>
                 </div>
-                <div className="pl-6 space-y-1">
-                  <p className="text-sm text-slate-900 dark:text-white font-medium">
-                    {voter.name}
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className="border-green-200 dark:border-green-500/50 text-green-700 dark:text-green-400 font-mono text-xs"
-                  >
-                    ID: {voter.matricNumber}
-                  </Badge>
+
+                <div className="flex items-center">
+                  {/* Avatar */}
+                  <div className="flex gap-3 items-center justify-center">
+                    <div
+                      className={`
+          w-16 h-16 rounded-full bg-gradient-to-b dark:from-blue-500/30 dark:via-55% dark:to-gray-900 border border-gray-500/30
+          flex items-center justify-center text-white font-bold text-lg
+          shadow-2xl
+        `}
+                    >
+                      <FaUser size={24} className="text-indigo-400/40" />
+                    </div>
+                  </div>
+                  <div className="pl-6 space-y-1">
+                    <p className="text-base text-slate-900 dark:text-white font-bold">
+                      {voter.name}
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className="border-green-200 dark:border-green-500/50 text-green-700 dark:text-green-400 font-mono text-xs"
+                    >
+                      ID: {voter.matricNumber}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
@@ -361,7 +397,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Time Remaining
+                    Election closes in
                   </span>
                 </div>
                 <ElectionCountdownTimer endDate={election.endDate} />
@@ -640,15 +676,15 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                   onClick={() => setShowConfirmation(true)}
                   disabled={
                     selectedCategories.length !== categories.length ||
-                    isConfirming ||
+                    isSubmitting ||
                     isVotingEnded
                   }
                   className="flex-1 bg-[#324278] hover:bg-blue-900 cursor-pointer text-white font-medium py-3 h-12 disabled:opacity-50"
                 >
-                  {isConfirming ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting Vote..
+                      Submitting Vote...
                     </>
                   ) : (
                     <>

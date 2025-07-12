@@ -242,7 +242,7 @@ const VoterAuthenticationModal = ({
                 <Input
                   id="matricNumber"
                   type="text"
-                  placeholder="Enter your matriculation number"
+                  placeholder="Enter your matriculation number (e.g. UNI/12/2021)"
                   value={matricNumber}
                   onChange={(e) => setMatricNumber(e.target.value)}
                   className="pl-10 bg-slate-300/20 dark:bg-slate-800/50 dark:border-slate-600 placeholder-slate-400"
@@ -263,7 +263,7 @@ const VoterAuthenticationModal = ({
                 <Input
                   id="surname"
                   type="text"
-                  placeholder="Enter your surname only"
+                  placeholder="Enter your surname only (e.g David)"
                   value={surname}
                   onChange={(e) => setSurname(e.target.value)}
                   className="pl-10 bg-slate-300/20 dark:bg-slate-800/50 dark:border-slate-600 placeholder-slate-400"

@@ -15,6 +15,7 @@ const ElectionCandidateCard: React.FC<{
   isSingleCandidate = false,
 }) => {
   const showActualVotes = electionStatus === "COMPLETED";
+  const showVoteCounts = electionStatus === "COMPLETED"; // Only show vote counts when completed
 
   const voteFor = candidate.voteFor || 0n;
   const voteAgainst = candidate.voteAgainst || 0n;
@@ -121,46 +122,62 @@ const ElectionCandidateCard: React.FC<{
       </div>
 
       {/* Vote Count Section */}
-      {isSingleCandidate ? (
-        <div className="space-y-3">
-          <div className="flex justify-between items-center bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <ThumbsUp size={16} className="text-green-600" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                Vote For
-              </span>
-            </div>
-            <div className="text-xl font-bold text-green-600 dark:text-green-400">
-              {voteFor.toString()}
-            </div>
-          </div>
+      {showVoteCounts ? (
+        <>
+          {isSingleCandidate ? (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <ThumbsUp size={16} className="text-green-600" />
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                    Vote For
+                  </span>
+                </div>
+                <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                  {voteFor.toString()}
+                </div>
+              </div>
 
-          <div className="flex justify-between items-center bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <ThumbsDown size={16} className="text-red-600" />
-              <span className="text-sm font-medium text-red-700 dark:text-red-400">
-                Vote Against
-              </span>
+              <div className="flex justify-between items-center bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <ThumbsDown size={16} className="text-red-600" />
+                  <span className="text-sm font-medium text-red-700 dark:text-red-400">
+                    Vote Against
+                  </span>
+                </div>
+                <div className="text-xl font-bold text-red-600 dark:text-red-400">
+                  {voteAgainst.toString()}
+                </div>
+              </div>
             </div>
-            <div className="text-xl font-bold text-red-600 dark:text-red-400">
-              {voteAgainst.toString()}
+          ) : (
+            <div className="text-center flex justify-between items-center bg-[#D6DADD]/30 dark:bg-gray-700/50 rounded-lg p-2 px-4">
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Final Vote Count
+              </div>
+              <div
+                className={`text-2xl font-bold flex items-center justify-center gap-1 ${
+                  isLeading
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-yellow-600 dark:text-yellow-400"
+                }`}
+              >
+                {voteFor.toString()}
+                {isLeading && (
+                  <TrendingUp size={16} className="text-green-500" />
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       ) : (
+        // Show N/A when election is not completed
         <div className="text-center flex justify-between items-center bg-[#D6DADD]/30 dark:bg-gray-700/50 rounded-lg p-2 px-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            {showActualVotes ? "Final Vote Count" : "Vote Count"}
+            Vote Count
           </div>
-          <div
-            className={`text-2xl font-bold flex items-center justify-center gap-1 ${
-              isLeading
-                ? "text-green-600 dark:text-green-400"
-                : "text-yellow-600 dark:text-yellow-400"
-            }`}
-          >
-            {voteFor.toString()}
-            {isLeading && <TrendingUp size={16} className="text-green-500" />}
+          <div className="text-2xl font-bold text-gray-500 dark:text-gray-400">
+            N/A
           </div>
         </div>
       )}

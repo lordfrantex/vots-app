@@ -19,6 +19,7 @@ const ElectionCard: React.FC<ElectionCardProps> = ({ election }) => {
 
     switch (status) {
       case "ACTIVE":
+        return `${baseClasses} bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/30`;
       case "UPCOMING":
         return `${baseClasses} bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30`;
       case "COMPLETED":

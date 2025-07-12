@@ -48,19 +48,29 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
 
   const getTimeUntilStatusChange = useCallback((election: any) => {
     if (!election) return null;
+
     const now = Date.now();
     const startTime = new Date(election.startDate).getTime();
     const endTime = new Date(election.endDate).getTime();
 
-    if (election.status === "UPCOMING") {
+    // Add validation for valid dates
+    if (isNaN(startTime) || isNaN(endTime)) {
+      console.error(
+        "Invalid election dates:",
+        election.startDate,
+        election.endDate,
+      );
+      return null;
+    }
+
+    if (election.status === "UPCOMING" && now < startTime) {
       return startTime - now;
-    } else if (election.status === "ACTIVE") {
+    } else if (election.status === "ACTIVE" && now < endTime) {
       return endTime - now;
     }
 
     return null;
   }, []);
-
   const handleAutoRefresh = useCallback(async () => {
     hasAutoRefreshedRef.current = true;
 
@@ -129,19 +139,97 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
   }, [contractElection, storeElection, addElection, setCurrentElection]);
 
   useEffect(() => {
+    // Clear any existing intervals
+    if (statusCheckIntervalRef.current) {
+      clearInterval(statusCheckIntervalRef.current);
+      statusCheckIntervalRef.current = null;
+    }
+
+    const getCurrentElection = () => storeElection || contractElection;
+    const election = getCurrentElection();
+
+    if (!election || contractLoading) return;
+
+    const getTimeUntilStatusChange = (electionData: any) => {
+      if (!electionData) return null;
+      const now = Date.now();
+      const startTime = new Date(electionData.startDate).getTime();
+      const endTime = new Date(electionData.endDate).getTime();
+
+      if (electionData.status === "UPCOMING") {
+        return startTime - now;
+      } else if (electionData.status === "ACTIVE") {
+        return endTime - now;
+      }
+      return null;
+    };
+
+    const performRefresh = async () => {
+      hasAutoRefreshedRef.current = true;
+
+      try {
+        // Clear interval before refresh to prevent multiple calls
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current);
+          statusCheckIntervalRef.current = null;
+        }
+
+        await refetch();
+
+        // Small delay to ensure the refetch completes
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      } catch (error) {
+        console.error("Error during auto-refresh:", error);
+        window.location.reload();
+      }
+    };
+
+    const timeUntilChange = getTimeUntilStatusChange(election);
+
+    if (timeUntilChange !== null && timeUntilChange > 0) {
+      // Set up interval to check status periodically
+      const checkInterval = Math.min(
+        30000,
+        Math.max(5000, timeUntilChange / 10),
+      ); // Dynamic interval
+
+      statusCheckIntervalRef.current = setInterval(() => {
+        const currentElection = getCurrentElection();
+        const currentTimeUntilChange =
+          getTimeUntilStatusChange(currentElection);
+
+        if (currentTimeUntilChange !== null && currentTimeUntilChange <= 0) {
+          performRefresh();
+        }
+      }, checkInterval);
+
+      // Also set up exact timeout as backup
+      const exactTimeout = setTimeout(() => {
+        performRefresh();
+      }, timeUntilChange + 2000); // Reduced buffer time
+
+      return () => {
+        clearTimeout(exactTimeout);
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current);
+          statusCheckIntervalRef.current = null;
+        }
+      };
+    }
+
     return () => {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current);
         statusCheckIntervalRef.current = null;
       }
     };
-  }, []);
+  }, [electionId, contractLoading]); // Simplified dependency array
 
   const election = storeElection || contractElection;
   const isLoading = contractLoading && !storeElection;
   const error = contractError;
-
-  console.log("Election Data:", election);
 
   const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
@@ -171,8 +259,6 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
       };
     });
   }, [election?.voters, election?.accreditedVoters]);
-
-  console.log("Enhanced Voters:", enhancedVoters);
 
   const tabFilteredVoters = useMemo(() => {
     switch (activeTab) {
