@@ -7,6 +7,7 @@ import ElectionResult from "@/app/elections/[electionId]/components/election-res
 import { formatDate } from "@/lib/utils";
 import { useElectionStore } from "@/store/use-election";
 import { useRouter } from "next/navigation";
+import { useElectionDetails } from "@/hooks/use-contract-address";
 
 interface ElectionInformationProps {
   electionId: string;
@@ -18,8 +19,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
   onViewResults,
 }) => {
   const router = useRouter();
-  const { getElectionById } = useElectionStore();
-  const election = getElectionById(electionId);
+  const { election } = useElectionDetails(electionId);
 
   if (!election) {
     return null;

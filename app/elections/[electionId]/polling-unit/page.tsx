@@ -55,41 +55,30 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
   // Check session validity on mount and session changes
   useEffect(() => {
     if (isSessionValid()) {
-      console.log("Valid session found, proceeding to authentication");
-      const walletAddress = session.walletClient.account.address;
-      setPollingUnit({
-        unitId: `unit-${walletAddress.slice(-6)}`,
-        unitName: `Polling Unit ${walletAddress.slice(-6)}`,
-        address: walletAddress,
-      });
-      setShowPollingUnitModal(false);
-      setCurrentStep("authentication");
-
-      // Set polling unit info based on session
-      if (session.walletClient?.account) {
+      if (currentStep === "validation") {
+        console.log("Valid session found, proceeding to authentication");
         const walletAddress = session.walletClient.account.address;
         setPollingUnit({
           unitId: `unit-${walletAddress.slice(-6)}`,
           unitName: `Polling Unit ${walletAddress.slice(-6)}`,
           address: walletAddress,
         });
+        setShowPollingUnitModal(false);
+        setCurrentStep("authentication");
       }
     } else {
       console.log("No valid session, showing validation modal");
       setShowPollingUnitModal(true);
       setCurrentStep("validation");
     }
-  }, [session.isValid, session.walletClient]);
+  }, [session.isValid, session.walletClient, currentStep, isSessionValid]);
 
   const handlePollingUnitValidationClose = () => {
-    // Always close the modal, but check session validity
     setShowPollingUnitModal(false);
 
-    // Check if session is now valid
     if (isSessionValid()) {
       setCurrentStep("authentication");
 
-      // Set polling unit info
       if (session.walletClient?.account) {
         const walletAddress = session.walletClient.account.address;
         setPollingUnit({
@@ -99,7 +88,6 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
         });
       }
     } else {
-      // If session is not valid, keep showing validation modal
       setTimeout(() => {
         setShowPollingUnitModal(true);
       }, 500);

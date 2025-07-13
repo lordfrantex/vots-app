@@ -68,6 +68,11 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
     }, 0);
   };
 
+  // Check if a category has only one candidate
+  const isSingleCandidate = (category: string) => {
+    return resultsByCategory[category]?.length === 1;
+  };
+
   // Handle category change - this will control both results and chart
   const handleCategoryChange = (category: string) => {
     setActiveCategory(category);
@@ -78,6 +83,8 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
     index: number,
     categoryName: string,
   ) => {
+    const isOnlyCandidate = isSingleCandidate(categoryName);
+
     return (
       <div
         key={`${categoryName}-${candidate.id}-${index}`}
@@ -97,11 +104,39 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
             </p>
           </div>
         </div>
-        <div>
-          <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-            {candidate.voteCount || 0} Votes
-          </p>
-        </div>
+
+        {isOnlyCandidate ? (
+          <div className="text-right">
+            <div className="flex gap-4 mb-1">
+              <div className="text-center">
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                  {candidate.voteFor || 0}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">For</p>
+              </div>
+              <div className="text-center">
+                <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
+                  {candidate.voteAgainst || 0}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Against
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Total: {(candidate.voteFor || 0) + (candidate.voteAgainst || 0)}{" "}
+              votes
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p
+              className={`text-lg font-bold ${candidate.voteFor ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}`}
+            >
+              {candidate.voteFor || candidate.voteAgainst} Votes
+            </p>
+          </div>
+        )}
       </div>
     );
   };
@@ -158,13 +193,11 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
-                  <p className="text-2xl font-bold text-indigo-600">
-                    {election?.totalVoters}
-                  </p>
+                  <p className="text-2xl font-bold">{election?.totalVoters}</p>
                   <p className="text-sm text-gray-600">Total Voters</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-green-600">
                     {election?.totalVotes}
                   </p>
                   <p className="text-sm text-gray-600">Votes Cast</p>

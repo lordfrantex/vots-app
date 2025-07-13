@@ -70,24 +70,64 @@ export function Dashboard({
   // Enhance all voters
   const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
+
+    // Create sets for efficient lookup
+    const accreditedIds = new Set(
+      election.accreditedVoters?.map((v) => v.id) || [],
+    );
+
+    // Get voted voters from accreditedVoters array (they have the hasVoted info)
+    const votedIds = new Set(
+      election.accreditedVoters
+        ?.filter((v) => v.hasVoted === true || v.voterState === 3)
+        .map((v) => v.id) || [],
+    );
+
+    console.log("Accredited IDs:", accreditedIds);
+    console.log("Voted IDs:", votedIds);
+    console.log("AccreditedVoters with vote info:", election.accreditedVoters);
+
     return election.voters.map((voter) => {
-      const isAccredited = accreditedSet.has(voter.id);
-      const hasVoted = votedSet.has(voter.id);
+      // Check if voter is in accredited array
+      const isInAccreditedArray = accreditedIds.has(voter.id);
+
+      // Check if voter has voted (from accreditedVoters array)
+      const hasVoted = votedIds.has(voter.id);
+
+      // A voter is accredited if they're in the accreditedVoters array
+      const isAccredited = isInAccreditedArray;
+
       return {
         id: voter.id,
         name: voter.name,
         matricNumber: voter.matricNumber,
+        department: voter.department,
         level: voter.level ? Number(voter.level) : undefined,
-        department: voter.department || undefined,
-        isRegistered: true,
         isAccredited,
         hasVoted,
+        isRegistered: true, // All voters in the array are registered
         photo: "/placeholder-user.jpg",
         accreditedAt: isAccredited ? new Date().toISOString() : undefined,
         votedAt: hasVoted ? new Date().toISOString() : undefined,
       };
     });
-  }, [election?.voters, accreditedSet, votedSet]);
+  }, [election?.voters, election?.accreditedVoters]);
+
+  // Updated tabFilteredVoters logic
+  const tabFilteredVoters = useMemo(() => {
+    switch (activeTab) {
+      case "REGISTERED":
+        return enhancedVoters; // All voters (they're all registered)
+      case "ACCREDITED":
+        return enhancedVoters.filter((v) => v.isAccredited); // Accredited but not voted
+      case "VOTED":
+        return enhancedVoters.filter((v) => v.hasVoted); // Has voted
+      case "UNACCREDITED":
+        return enhancedVoters.filter((v) => !v.isAccredited); // Not accredited (and by extension, not voted)
+      default:
+        return enhancedVoters;
+    }
+  }, [activeTab, enhancedVoters]);
 
   const totalVoters = enhancedVoters.length;
   const accreditedCount = election?.accreditedVotersCount || 0;

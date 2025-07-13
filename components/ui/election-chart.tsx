@@ -59,6 +59,11 @@ const CHART_COLORS = [
   "hsl(245, 100%, 85%)",
 ];
 
+const FOR_AGAINST_COLORS = {
+  for: "hsl(142, 76%, 36%)", // Green for "For"
+  against: "hsl(39,84%,60%)", // Red for "Against"
+};
+
 const ElectionChart: React.FC<ElectionChartProps> = ({
   election,
   selectedCategory,
@@ -108,31 +113,79 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
     onCategoryChange?.(category);
   };
 
+  // Check if a category has only one candidate
+  const isSingleCandidate = (category: string) => {
+    return resultsByCategory[category]?.length === 1;
+  };
+
   const prepareChartData = (category: string) => {
     const candidates = resultsByCategory[category] || [];
+    const isOnlyCandidate = isSingleCandidate(category);
+
+    if (isOnlyCandidate && candidates.length > 0) {
+      const candidate = candidates[0];
+      return [
+        {
+          name: `For ${candidate.name}`,
+          votes: candidate.voteFor || 0,
+          fill: FOR_AGAINST_COLORS.for,
+          id: `${candidate.id}-for`,
+          matricNumber: candidate.matricNo,
+          type: "for",
+        },
+        {
+          name: `Against ${candidate.name}`,
+          votes: candidate.voteAgainst || 0,
+          fill: FOR_AGAINST_COLORS.against,
+          id: `${candidate.id}-against`,
+          matricNumber: candidate.matricNo,
+          type: "against",
+        },
+      ];
+    }
+
+    // For multiple candidates, use consistent for/against color scheme
     return candidates.map((candidate, index) => ({
       name: candidate.name,
       votes: candidate.voteCount || 0,
-      fill: CHART_COLORS[index % CHART_COLORS.length],
+      fill:
+        index % 2 === 0 ? FOR_AGAINST_COLORS.for : FOR_AGAINST_COLORS.against,
       id: candidate.id,
       matricNumber: candidate.matricNo,
+      type: "candidate",
     }));
   };
 
   const createChartConfig = (category: string): ChartConfig => {
     const candidates = resultsByCategory[category] || [];
+    const isOnlyCandidate = isSingleCandidate(category);
     const config: ChartConfig = {
       votes: {
         label: "Votes",
       },
     };
 
-    candidates.forEach((candidate, index) => {
-      config[candidate.id] = {
-        label: candidate.name,
-        color: CHART_COLORS[index % CHART_COLORS.length],
+    if (isOnlyCandidate && candidates.length > 0) {
+      const candidate = candidates[0];
+      config[`${candidate.id}-for`] = {
+        label: `For ${candidate.name}`,
+        color: FOR_AGAINST_COLORS.for,
       };
-    });
+      config[`${candidate.id}-against`] = {
+        label: `Against ${candidate.name}`,
+        color: FOR_AGAINST_COLORS.against,
+      };
+    } else {
+      candidates.forEach((candidate, index) => {
+        config[candidate.id] = {
+          label: candidate.name,
+          color:
+            index % 2 === 0
+              ? FOR_AGAINST_COLORS.for
+              : FOR_AGAINST_COLORS.against,
+        };
+      });
+    }
 
     return config;
   };
@@ -146,7 +199,33 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
 
   const getWinnerInfo = (category: string) => {
     const candidates = resultsByCategory[category] || [];
+    const isOnlyCandidate = isSingleCandidate(category);
+
     if (candidates.length === 0) return null;
+
+    if (isOnlyCandidate) {
+      const candidate = candidates[0];
+      const forVotes = candidate.voteFor || 0;
+      const againstVotes = candidate.voteAgainst || 0;
+      const total = forVotes + againstVotes;
+
+      if (total === 0) return null;
+
+      const result = forVotes > againstVotes ? "approved" : "rejected";
+      const percentage = (
+        (Math.max(forVotes, againstVotes) / total) *
+        100
+      ).toFixed(1);
+
+      return {
+        winner: candidate,
+        percentage,
+        result,
+        forVotes,
+        againstVotes,
+        isSingleCandidate: true,
+      };
+    }
 
     const winner = candidates[0];
     const totalCategoryVotes = candidates.reduce(
@@ -158,21 +237,30 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
         ? (((winner.voteCount || 0) / totalCategoryVotes) * 100).toFixed(1)
         : "0";
 
-    return { winner, percentage: winnerPercentage };
+    return {
+      winner,
+      percentage: winnerPercentage,
+      isSingleCandidate: false,
+    };
   };
 
   const winnerInfo = getWinnerInfo(activeCategory as string);
 
   const renderChart = () => {
+    const isOnlyCandidate = isSingleCandidate(activeCategory as string);
+
     if (chartType === "pie") {
       return (
         <Card className="flex flex-col bg-gray-50 dark:bg-gray-900">
           <CardHeader className="items-center pb-0">
             <CardTitle className="text-lg">
-              {activeCategory as string} - Vote Distribution
+              {activeCategory as string} -{" "}
+              {isOnlyCandidate ? "Vote Distribution" : "Vote Distribution"}
             </CardTitle>
             <CardDescription>
-              Election Results for {activeCategory as string}
+              {isOnlyCandidate
+                ? `For/Against Results for ${activeCategory as string}`
+                : `Election Results for ${activeCategory as string}`}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 pb-0">
@@ -228,11 +316,31 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
           <CardFooter className="flex-col gap-2 text-sm items-center">
             {winnerInfo && (
               <>
-                <div className="flex items-center gap-2 leading-none font-medium text-green-600">
-                  <TrendingUp className="h-4 w-4" />
-                  {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
-                  of votes
-                </div>
+                {winnerInfo.isSingleCandidate ? (
+                  <div className="flex items-center gap-2 leading-none font-medium">
+                    <TrendingUp className="h-4 w-4" />
+                    <span
+                      className={
+                        winnerInfo.result === "approved"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }
+                    >
+                      {winnerInfo.winner.name} {winnerInfo.result} with{" "}
+                      {winnerInfo.percentage}% (
+                      {winnerInfo.result === "approved"
+                        ? winnerInfo.forVotes
+                        : winnerInfo.againstVotes}{" "}
+                      votes)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 leading-none font-medium text-green-600">
+                    <TrendingUp className="h-4 w-4" />
+                    {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
+                    of votes
+                  </div>
+                )}
                 <div className="text-muted-foreground leading-none text-center">
                   {totalVotes} total votes cast in {activeCategory as string}
                 </div>
@@ -247,10 +355,13 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
       <Card className="bg-gray-50 dark:bg-gray-900">
         <CardHeader>
           <CardTitle className="text-lg">
-            {activeCategory as string} - Vote Distribution
+            {activeCategory as string} -{" "}
+            {isOnlyCandidate ? "Vote Distribution" : "Vote Distribution"}
           </CardTitle>
           <CardDescription>
-            Election Results for {activeCategory as string}
+            {isOnlyCandidate
+              ? `For/Against Results for ${activeCategory as string}`
+              : `Election Results for ${activeCategory as string}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -268,8 +379,8 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
                   tickMargin={10}
                   axisLine={false}
                   tickFormatter={(value) => {
-                    return value.length > 10
-                      ? `${value.substring(0, 10)}...`
+                    return value.length > 15
+                      ? `${value.substring(0, 15)}...`
                       : value;
                   }}
                 />
@@ -301,11 +412,31 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
         <CardFooter className="flex-col items-center gap-2 text-sm">
           {winnerInfo && (
             <>
-              <div className="flex gap-2 leading-none font-medium text-green-600">
-                <TrendingUp className="h-4 w-4" />
-                {winnerInfo.winner.name} leads with {winnerInfo.percentage}% of
-                votes
-              </div>
+              {winnerInfo.isSingleCandidate ? (
+                <div className="flex gap-2 leading-none font-medium">
+                  <TrendingUp className="h-4 w-4" />
+                  <span
+                    className={
+                      winnerInfo.result === "approved"
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }
+                  >
+                    {winnerInfo.winner.name} {winnerInfo.result} with{" "}
+                    {winnerInfo.percentage}% (
+                    {winnerInfo.result === "approved"
+                      ? winnerInfo.forVotes
+                      : winnerInfo.againstVotes}{" "}
+                    votes)
+                  </span>
+                </div>
+              ) : (
+                <div className="flex gap-2 leading-none font-medium text-green-600">
+                  <TrendingUp className="h-4 w-4" />
+                  {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
+                  of votes
+                </div>
+              )}
               <div className="text-muted-foreground leading-none">
                 {totalVotes} total votes cast in {activeCategory as string}
               </div>
