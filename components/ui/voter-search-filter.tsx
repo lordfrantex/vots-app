@@ -95,7 +95,7 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
       {
         key: "accredited" as VoterStatus,
         label: "Accredited",
-        count: statusCounts.voted + statusCounts.accredited,
+        count: statusCounts.accredited,
         icon: UserCheck,
       },
       {
@@ -303,10 +303,10 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
 
         {/* Results Summary */}
         <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-          {/*<span>*/}
-          {/*  Showing {filteredVoters.length} of {statusCounts[selectedStatus]}{" "}*/}
-          {/*  {selectedStatus} voters*/}
-          {/*</span>*/}
+          <span>
+            Showing {filteredVoters.length} of {statusCounts[selectedStatus]}{" "}
+            {selectedStatus} voters
+          </span>
           {(selectedLevel !== "all" ||
             selectedDepartment !== "all" ||
             searchTerm) && (

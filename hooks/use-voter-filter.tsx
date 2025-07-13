@@ -46,16 +46,17 @@ export const useVoterFilter = (voters: EnhancedVoter[] = []) => {
     voters.forEach((voter) => {
       if (voter.hasVoted) {
         counts.voted++;
-      } else if (voter.isAccredited) {
-        counts.accredited++;
-      } else if (voter.isRegistered && !voter.isAccredited) {
+      }
+      if (voter.isAccredited) {
+        counts.accredited++; // Count ALL accredited voters (voted + not voted)
+      }
+      if (voter.isRegistered && !voter.isAccredited) {
         counts.unaccredited++;
       }
     });
 
     return counts;
   }, [voters]);
-
   // Filter voters based on search and filter criteria
   // Filter voters based on search and filter criteria
   useEffect(() => {
