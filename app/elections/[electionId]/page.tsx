@@ -234,29 +234,46 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
 
   console.log("Individaual Election", election);
 
+  // Updated enhancedVoters computation in your ElectionPage component
+  // Updated enhancedVoters computation in your ElectionPage component
   const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
 
+    // Create sets for efficient lookup
     const accreditedIds = new Set(
       election.accreditedVoters?.map((v) => v.id) || [],
     );
+
+    // Get voted voters from accreditedVoters array (they have the hasVoted info)
     const votedIds = new Set(
-      election.voters?.filter((v) => v.hasVoted).map((v) => v.id) || [],
+      election.accreditedVoters
+        ?.filter((v) => v.hasVoted === true || v.voterState === 3)
+        .map((v) => v.id) || [],
     );
-    console.log("Accredited IDs:", election.accreditedVoters);
+
+    console.log("Accredited IDs:", accreditedIds);
+    console.log("Voted IDs:", votedIds);
+    console.log("AccreditedVoters with vote info:", election.accreditedVoters);
 
     return election.voters.map((voter) => {
-      const isAccredited = accreditedIds.has(voter.id);
+      // Check if voter is in accredited array
+      const isInAccreditedArray = accreditedIds.has(voter.id);
+
+      // Check if voter has voted (from accreditedVoters array)
       const hasVoted = votedIds.has(voter.id);
+
+      // A voter is accredited if they're in the accreditedVoters array
+      const isAccredited = isInAccreditedArray;
+
       return {
         id: voter.id,
         name: voter.name,
         matricNumber: voter.matricNumber,
         department: voter.department,
         level: voter.level ? Number(voter.level) : undefined,
-        isAccredited: voter.voterState === 0,
+        isAccredited,
         hasVoted,
-        isRegistered: true,
+        isRegistered: true, // All voters in the array are registered
         photo: "/placeholder-user.jpg",
         accreditedAt: isAccredited ? new Date().toISOString() : undefined,
         votedAt: hasVoted ? new Date().toISOString() : undefined,
@@ -264,14 +281,17 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     });
   }, [election?.voters, election?.accreditedVoters]);
 
+  // Updated tabFilteredVoters logic
   const tabFilteredVoters = useMemo(() => {
     switch (activeTab) {
+      case "REGISTERED":
+        return enhancedVoters; // All voters (they're all registered)
       case "ACCREDITED":
-        return enhancedVoters.filter((v) => v.isAccredited);
+        return enhancedVoters.filter((v) => v.isAccredited); // Accredited but not voted
       case "VOTED":
-        return enhancedVoters.filter((v) => v.hasVoted);
+        return enhancedVoters.filter((v) => v.hasVoted); // Has voted
       case "UNACCREDITED":
-        return enhancedVoters.filter((v) => !v.isAccredited);
+        return enhancedVoters.filter((v) => !v.isAccredited); // Not accredited (and by extension, not voted)
       default:
         return enhancedVoters;
     }

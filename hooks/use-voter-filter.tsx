@@ -15,7 +15,8 @@ export const useVoterFilter = (voters: EnhancedVoter[] = []) => {
   const getVoterStatus = useCallback((voter: EnhancedVoter): VoterStatus => {
     if (voter.hasVoted) return "voted";
     if (voter.isAccredited) return "accredited";
-    return "unaccredited";
+    if (voter.isRegistered && !voter.isAccredited) return "unaccredited";
+    return "registered";
   }, []);
 
   // Get unique levels and departments for filter options
@@ -43,13 +44,19 @@ export const useVoterFilter = (voters: EnhancedVoter[] = []) => {
     };
 
     voters.forEach((voter) => {
-      const status = getVoterStatus(voter);
-      counts[status]++;
+      if (voter.hasVoted) {
+        counts.voted++;
+      } else if (voter.isAccredited) {
+        counts.accredited++;
+      } else if (voter.isRegistered && !voter.isAccredited) {
+        counts.unaccredited++;
+      }
     });
 
     return counts;
-  }, [voters, getVoterStatus]);
+  }, [voters]);
 
+  // Filter voters based on search and filter criteria
   // Filter voters based on search and filter criteria
   useEffect(() => {
     const filtered = voters.filter((voter) => {
@@ -62,9 +69,23 @@ export const useVoterFilter = (voters: EnhancedVoter[] = []) => {
         voter.department?.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Status filter
-      const voterStatus = getVoterStatus(voter);
-      const matchesStatus =
-        selectedStatus === "registered" || voterStatus === selectedStatus;
+      let matchesStatus = false;
+      switch (selectedStatus) {
+        case "registered":
+          matchesStatus = voter.isRegistered;
+          break;
+        case "accredited":
+          matchesStatus = voter.isAccredited;
+          break;
+        case "voted":
+          matchesStatus = voter.hasVoted;
+          break;
+        case "unaccredited":
+          matchesStatus = voter.isRegistered && !voter.isAccredited;
+          break;
+        default:
+          matchesStatus = true;
+      }
 
       // Level filter
       const matchesLevel =
@@ -80,14 +101,7 @@ export const useVoterFilter = (voters: EnhancedVoter[] = []) => {
     });
 
     setFilteredVoters(filtered);
-  }, [
-    voters,
-    searchTerm,
-    selectedStatus,
-    selectedLevel,
-    selectedDepartment,
-    getVoterStatus,
-  ]);
+  }, [voters, searchTerm, selectedStatus, selectedLevel, selectedDepartment]);
 
   // Clear all filters
   const clearFilters = useCallback(() => {
