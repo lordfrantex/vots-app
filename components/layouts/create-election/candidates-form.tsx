@@ -165,13 +165,13 @@ export function CandidatesForm({
                 Register candidates for each position category
               </p>
               <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  className="border-gray-600 text-gray-600 dark:text-gray-300 cursor-pointer"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload CSV
-                </Button>
+                {/*<Button*/}
+                {/*  variant="outline"*/}
+                {/*  className="border-gray-600 text-gray-600 dark:text-gray-300 cursor-pointer"*/}
+                {/*>*/}
+                {/*  <Upload className="w-4 h-4 mr-2" />*/}
+                {/*  Upload CSV*/}
+                {/*</Button>*/}
                 <Button
                   onClick={addCandidate}
                   className="bg-green-500/20 hover:bg-green-500/30 text-green-700 dark:text-green-400 border-green-500/30 cursor-pointer"

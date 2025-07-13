@@ -68,11 +68,15 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
           (candidate as any).outcome = getSingleCandidateOutcome(candidate);
         });
       } else {
+        // Fixed: Proper numeric comparison for BigInt values
         candidatesByCategory[category].sort((a, b) => {
-          // Convert BigInt to string for comparison
-          const aVotes = (a.voteFor || 0n).toString();
-          const bVotes = (b.voteFor || 0n).toString();
-          return bVotes.localeCompare(aVotes);
+          const aVotes = a.voteFor || 0n;
+          const bVotes = b.voteFor || 0n;
+
+          // Compare BigInt values properly
+          if (bVotes > aVotes) return 1;
+          if (bVotes < aVotes) return -1;
+          return 0;
         });
       }
     });

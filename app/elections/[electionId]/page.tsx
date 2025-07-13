@@ -71,6 +71,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
 
     return null;
   }, []);
+
   const handleAutoRefresh = useCallback(async () => {
     hasAutoRefreshedRef.current = true;
 
@@ -231,6 +232,8 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
   const isLoading = contractLoading && !storeElection;
   const error = contractError;
 
+  console.log("Individaual Election", election);
+
   const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
 
@@ -240,6 +243,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     const votedIds = new Set(
       election.voters?.filter((v) => v.hasVoted).map((v) => v.id) || [],
     );
+    console.log("Accredited IDs:", election.accreditedVoters);
 
     return election.voters.map((voter) => {
       const isAccredited = accreditedIds.has(voter.id);
@@ -250,7 +254,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
         matricNumber: voter.matricNumber,
         department: voter.department,
         level: voter.level ? Number(voter.level) : undefined,
-        isAccredited,
+        isAccredited: voter.voterState === 0,
         hasVoted,
         isRegistered: true,
         photo: "/placeholder-user.jpg",
@@ -272,6 +276,8 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
         return enhancedVoters;
     }
   }, [activeTab, enhancedVoters]);
+
+  console.log("Tab filtered voters:", tabFilteredVoters);
 
   const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
     null,
@@ -378,7 +384,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
             </Tabs>
 
             <VoterSearchFilter
-              voters={enhancedVoters}
+              voters={tabFilteredVoters}
               onFilter={handleFilterChange}
               onVoterSelect={handleVoterSelect}
               showResults={true}
