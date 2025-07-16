@@ -80,7 +80,6 @@ export function usePollingUnitSession() {
         JSON.stringify({ privateKey: formattedPrivateKey }),
       );
 
-      console.log("Polling unit session initialized successfully");
       return { walletClient, publicClient };
     } catch (error) {
       console.error("Failed to initialize polling unit session:", error);

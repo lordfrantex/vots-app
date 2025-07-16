@@ -576,12 +576,12 @@ export const useElectionDetails = (
             | undefined)
         : undefined;
 
-    console.log(`Single Election Detail (Status: ${electionStatus}):`, {
-      electionInfo,
-      allVotersData,
-      candidatesData,
-      accreditedVotersData,
-    });
+    // console.log(`Single Election Detail (Status: ${electionStatus}):`, {
+    //   electionInfo,
+    //   allVotersData,
+    //   candidatesData,
+    //   accreditedVotersData,
+    // });
 
     // Categories
     const categories: Category[] = (electionInfo?.electionCategories || []).map(

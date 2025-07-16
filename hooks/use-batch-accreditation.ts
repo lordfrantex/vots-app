@@ -52,8 +52,6 @@ export function useBatchAccreditVoters() {
       setProgress({ current: 0, total: params.voterMatricNumbers.length });
 
       try {
-        console.log("Batch accrediting voters:", params);
-
         // If your contract has a batch function, use it
         // Otherwise, we'll need to do individual transactions
         // For now, let's assume we need individual transactions

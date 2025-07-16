@@ -125,18 +125,9 @@ export function InputAccreditationPanel({
       return;
     }
 
-    console.log("=== ATTEMPTING ACCREDITATION ===");
-    console.log("Matric Number:", trimmedMatric);
-    console.log("Election ID:", electionId);
-
     try {
       // Call the accreditation function
       const result = await onAccredit(trimmedMatric);
-
-      console.log("=== ACCREDITATION RESULT ===");
-      console.log("Success:", result.success);
-      console.log("Message:", result.message);
-      console.log("Transaction Hash:", result.txHash);
 
       if (result.success) {
         // Show pending message

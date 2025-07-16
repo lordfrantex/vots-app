@@ -100,8 +100,6 @@ const ElectionClient: React.FC = () => {
     };
   }, [elections]);
 
-  console.log("Elections Client:", elections);
-
   return (
     <section className="max-w-7xl mx-auto pb-24">
       <div className="flex items-center justify-between mb-10">

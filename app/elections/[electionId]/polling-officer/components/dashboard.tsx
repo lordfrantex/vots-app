@@ -83,9 +83,9 @@ export function Dashboard({
         .map((v) => v.id) || [],
     );
 
-    console.log("Accredited IDs:", accreditedIds);
-    console.log("Voted IDs:", votedIds);
-    console.log("AccreditedVoters with vote info:", election.accreditedVoters);
+    // console.log("Accredited IDs:", accreditedIds);
+    // console.log("Voted IDs:", votedIds);
+    // console.log("AccreditedVoters with vote info:", election.accreditedVoters);
 
     return election.voters.map((voter) => {
       // Check if voter is in accredited array

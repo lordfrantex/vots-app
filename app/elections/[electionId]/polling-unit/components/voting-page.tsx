@@ -202,8 +202,6 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
       return;
     }
 
-    console.log("=== VOTE SUBMISSION START ===");
-
     try {
       setIsSubmitting(true);
       setShowConfirmation(false);
@@ -219,8 +217,6 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         }),
       );
 
-      console.log("Vote selections:", candidatesList);
-
       // Submit to blockchain using the hook
       const result = await voteCandidates({
         voterMatricNo: voter.matricNumber,
@@ -228,8 +224,6 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         candidatesList,
         electionTokenId: BigInt(electionId),
       });
-
-      console.log("Blockchain submission result:", result);
 
       if (!result.success) {
         toast.error("Failed to submit vote");
@@ -242,7 +236,6 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
       toast.error("Unexpected error occurred");
       setIsSubmitting(false);
     }
-    console.log("=== VOTE SUBMISSION END ===");
   };
 
   const isLoading = isSubmitting || isCreating;

@@ -232,7 +232,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
   const isLoading = contractLoading && !storeElection;
   const error = contractError;
 
-  console.log("Individaual Election", election);
+  //console.log("Individaual Election", election);
 
   // Updated enhancedVoters computation in your ElectionPage component
   // Updated enhancedVoters computation in your ElectionPage component
@@ -251,9 +251,9 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
         .map((v) => v.id) || [],
     );
 
-    console.log("Accredited IDs:", accreditedIds);
-    console.log("Voted IDs:", votedIds);
-    console.log("AccreditedVoters with vote info:", election.accreditedVoters);
+    // console.log("Accredited IDs:", accreditedIds);
+    // console.log("Voted IDs:", votedIds);
+    // console.log("AccreditedVoters with vote info:", election.accreditedVoters);
 
     return election.voters.map((voter) => {
       // Check if voter is in accredited array
@@ -297,7 +297,7 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     }
   }, [activeTab, enhancedVoters]);
 
-  console.log("Tab filtered voters:", tabFilteredVoters);
+  // console.log("Tab filtered voters:", tabFilteredVoters);
 
   const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
     null,

@@ -45,7 +45,7 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
 
   useEffect(() => {
     if (electionDetails?.status === "COMPLETED") {
-      console.log("Election has ended, clearing session");
+      // console.log("Election has ended, clearing session");
       clearSession();
       // Redirect to election page
       window.location.href = `/elections`;
@@ -56,7 +56,7 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
   useEffect(() => {
     if (isSessionValid()) {
       if (currentStep === "validation") {
-        console.log("Valid session found, proceeding to authentication");
+        // console.log("Valid session found, proceeding to authentication");
         const walletAddress = session.walletClient.account.address;
         setPollingUnit({
           unitId: `unit-${walletAddress.slice(-6)}`,
@@ -67,7 +67,7 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
         setCurrentStep("authentication");
       }
     } else {
-      console.log("No valid session, showing validation modal");
+      // console.log("No valid session, showing validation modal");
       setShowPollingUnitModal(true);
       setCurrentStep("validation");
     }

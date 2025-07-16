@@ -82,7 +82,6 @@ const VoterAuthenticationModal = ({
   // Handle validation success
   useEffect(() => {
     if (isValidationSuccess && validationHash) {
-      console.log("Voter validation successful");
       setAuthenticationResult({
         success: true,
         voter: {
@@ -136,12 +135,6 @@ const VoterAuthenticationModal = ({
     setAuthenticationResult(null);
 
     try {
-      console.log("Validating voter for voting:", {
-        matricNumber: matricNumber.trim(),
-        surname: surname.trim(),
-        electionTokenId: electionTokenId.toString(),
-      });
-
       // Call the blockchain validation function with CORRECT parameter names
       const result = await validateVoterForVoting({
         voterName: surname.trim(),

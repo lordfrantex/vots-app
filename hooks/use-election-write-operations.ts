@@ -113,12 +113,6 @@ export function useCreateElection() {
     async (
       params: CreateElectionParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== CREATE ELECTION START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Election params:", params);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -142,12 +136,6 @@ export function useCreateElection() {
       setError(null);
 
       try {
-        console.log("Calling writeContractAsync with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: createElection");
-        console.log("- Args:", [params.electionParams]);
-
         // Wait for the transaction to be submitted
         const transactionHash = await writeContractAsync({
           abi,
@@ -155,9 +143,6 @@ export function useCreateElection() {
           functionName: "createElection",
           args: [params.electionParams],
         });
-
-        console.log("writeContractAsync completed successfully");
-        console.log("Transaction hash:", transactionHash);
 
         return {
           success: true,
@@ -190,7 +175,6 @@ export function useCreateElection() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== CREATE ELECTION END ===");
       }
     },
     [address, chainId, writeContractAsync], // Remove hash and writeError from dependencies
@@ -234,9 +218,6 @@ export function useAccreditVoter() {
     async (
       params: AccreditVoterParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== ACCREDIT VOTER START ===");
-      console.log("Params:", params);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -260,8 +241,6 @@ export function useAccreditVoter() {
       setError(null);
 
       try {
-        console.log("Calling accreditVoter function...");
-
         writeContract({
           abi,
           address: contractAddress,
@@ -341,9 +320,6 @@ export function useValidateVoterForVoting() {
     async (
       params: ValidateVoterForVotingParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== VALIDATE VOTER FOR VOTING START ===");
-      console.log("Params:", params);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -367,8 +343,6 @@ export function useValidateVoterForVoting() {
       setError(null);
 
       try {
-        console.log("Calling validateVoterForVoting function...");
-
         writeContract({
           abi,
           address: contractAddress,
@@ -459,12 +433,6 @@ export function useValidatePollingOfficer() {
     async (
       electionTokenId: bigint,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== VALIDATE POLLING OFFICER START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Election Token ID:", electionTokenId);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -488,21 +456,12 @@ export function useValidatePollingOfficer() {
       setError(null);
 
       try {
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: validateAddressAsPollingOfficer");
-        console.log("- Args:", [electionTokenId]);
-
         writeContract({
           abi,
           address: contractAddress,
           functionName: "validateAddressAsPollingOfficer",
           args: [electionTokenId],
         });
-
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
 
         return {
           success: true,
@@ -544,7 +503,6 @@ export function useValidatePollingOfficer() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== VALIDATE POLLING OFFICER END ===");
       }
     },
     [address, chainId, writeContract, hash, writeError],
@@ -595,8 +553,6 @@ export function useValidatePollingUnit() {
     setError(null);
 
     try {
-      console.log("Validating polling unit with params:", params);
-
       const electionTokenIdBigInt = BigInt(params.electionTokenId);
 
       const hash = await walletClient.writeContract({
@@ -607,14 +563,10 @@ export function useValidatePollingUnit() {
         account: walletClient.account,
       });
 
-      console.log("Validation transaction submitted with hash:", hash);
-
       // Use publicClient to wait for receipt
       const receipt = await publicClient.waitForTransactionReceipt({
         hash,
       });
-
-      console.log("Validation transaction confirmed:", receipt);
 
       if (receipt.status === "success") {
         return {
@@ -678,8 +630,6 @@ export function useVoteCandidates() {
     setError(null);
 
     try {
-      console.log("Submitting vote with params:", params);
-
       // Submit the transaction
       const hash = await session.walletClient.writeContract({
         address: getContractAddress(chainId),
@@ -694,15 +644,11 @@ export function useVoteCandidates() {
         account: session.walletClient.account, // Add this line
       });
 
-      console.log("Transaction submitted with hash:", hash);
-
       // Wait for transaction confirmation
       const receipt = await session.walletClient.waitForTransactionReceipt({
         hash,
         timeout: 60000, // 1 minute timeout
       });
-
-      console.log("Transaction confirmed:", receipt);
 
       if (receipt.status === "success") {
         return {

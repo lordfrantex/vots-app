@@ -67,7 +67,6 @@ export function WalletConnectionModal({
   // Handle validation success
   useEffect(() => {
     if (isValidationSuccess && address) {
-      console.log("Polling officer validation successful");
       setValidationResult(true);
       setIsValidating(false);
       onConnect(address, true);
@@ -110,9 +109,6 @@ export function WalletConnectionModal({
     setValidationResult(null);
 
     try {
-      console.log("Validating polling officer wallet:", address);
-      console.log("Election Token ID:", electionTokenId);
-
       // Call the validation function
       const result = await validatePollingOfficer(electionTokenId);
 

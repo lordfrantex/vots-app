@@ -156,8 +156,6 @@ export function convertVoterToContract(
 export function convertPollingUnitToContract(
   unit: ExtendedPollingUnitInfo,
 ): ContractPollingUnitInfoDTO {
-  console.log("Converting polling unit:", unit);
-
   const validatedAddress = validateAddress(unit.address);
   if (!validatedAddress) {
     console.error(`Invalid polling unit address: ${unit.address}`);
@@ -266,8 +264,6 @@ export function convertPollingOfficerFromContract(
 export function convertToContractElectionParams(
   validationData: ValidationData,
 ): ContractElectionParams {
-  console.log("Converting validation data to ElectionParams:", validationData);
-
   try {
     const basicInfo = validationData.basicInfo;
     const categories = validationData.categories?.categories || [];
@@ -279,7 +275,6 @@ export function convertToContractElectionParams(
     // Convert candidates
     const candidatesList: readonly ContractCandidateInfoDTO[] = candidates.map(
       (candidate: any, index: number) => {
-        console.log(`Converting candidate ${index}:`, candidate);
         return convertCandidateToContract(candidate);
       },
     ) as readonly ContractCandidateInfoDTO[];
@@ -287,7 +282,6 @@ export function convertToContractElectionParams(
     // Convert voters with department and level
     const votersList: readonly ContractVoterInfoDTO[] = voters.map(
       (voter: any, index: number) => {
-        console.log(`Converting voter ${index}:`, voter);
         return convertVoterToContract(voter);
       },
     ) as readonly ContractVoterInfoDTO[];
@@ -295,14 +289,12 @@ export function convertToContractElectionParams(
     // Convert polling units - check if they have valid addresses
     const pollingUnitsList: readonly ContractPollingUnitInfoDTO[] =
       pollingUnits.map((unit: any, index: number) => {
-        console.log(`Converting polling unit ${index}:`, unit);
         return convertPollingUnitToContract(unit);
       }) as readonly ContractPollingUnitInfoDTO[];
 
     // Convert polling officers - check if they have valid addresses
     const pollingOfficersList: readonly ContractPollingOfficerInfoDTO[] =
       pollingOfficers.map((officer: any, index: number) => {
-        console.log(`Converting polling officer ${index}:`, officer);
         return convertPollingOfficerToContract(officer);
       }) as readonly ContractPollingOfficerInfoDTO[];
 
@@ -357,18 +349,6 @@ export function convertToContractElectionParams(
       pollingOfficers: pollingOfficersList,
       electionCategories,
     };
-
-    console.log("Final ElectionParams:", {
-      startTimeStamp: electionParams.startTimeStamp.toString(),
-      endTimeStamp: electionParams.endTimeStamp.toString(),
-      electionName: electionParams.electionName,
-      description: electionParams.description,
-      candidatesCount: electionParams.candidatesList.length,
-      votersCount: electionParams.votersList.length,
-      pollingUnitsCount: electionParams.pollingUnits.length,
-      pollingOfficersCount: electionParams.pollingOfficers.length,
-      categoriesCount: electionParams.electionCategories.length,
-    });
 
     return electionParams;
   } catch (error) {
