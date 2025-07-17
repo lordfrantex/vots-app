@@ -262,19 +262,6 @@ export function Dashboard({
           </Alert>
         )}
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(val) => setActiveTab(val as any)}
-          className="mb-4"
-        >
-          <TabsList>
-            <TabsTrigger value="REGISTERED">Registered</TabsTrigger>
-            <TabsTrigger value="ACCREDITED">Accredited</TabsTrigger>
-            <TabsTrigger value="VOTED">Voted</TabsTrigger>
-            <TabsTrigger value="UNACCREDITED">Unaccredited</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12">
           <InputAccreditationPanel
             onAccredit={handleAccreditVoter}
