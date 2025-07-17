@@ -58,6 +58,10 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
   const getSingleCandidateOutcome = (candidate: ContractCandidateInfoDTO) => {
     const voteFor = candidate.voteFor || 0n;
     const voteAgainst = candidate.voteAgainst || 0n;
+
+    if (voteFor === voteAgainst) {
+      return "tied";
+    }
     return voteFor > voteAgainst ? "elected" : "not_elected";
   };
 
@@ -68,7 +72,7 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
           (candidate as any).outcome = getSingleCandidateOutcome(candidate);
         });
       } else {
-        // Fixed: Proper numeric comparison for BigInt values
+        // Sort candidates by votes (descending order)
         candidatesByCategory[category].sort((a, b) => {
           const aVotes = a.voteFor || 0n;
           const bVotes = b.voteFor || 0n;
@@ -78,6 +82,29 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
           if (bVotes < aVotes) return -1;
           return 0;
         });
+
+        // Determine winners and ties
+        const sortedCandidates = candidatesByCategory[category];
+        if (sortedCandidates.length > 1) {
+          const highestVotes = sortedCandidates[0].voteFor || 0n;
+
+          // Check if there's a tie for the highest votes
+          const winnersCount = sortedCandidates.filter(
+            (candidate) => (candidate.voteFor || 0n) === highestVotes,
+          ).length;
+
+          // Mark candidates as winners or tied
+          sortedCandidates.forEach((candidate, index) => {
+            const candidateVotes = candidate.voteFor || 0n;
+            if (candidateVotes === highestVotes) {
+              (candidate as any).outcome = winnersCount > 1 ? "tied" : "winner";
+            } else {
+              (candidate as any).outcome = "not_winner";
+            }
+          });
+        } else if (sortedCandidates.length === 1) {
+          (sortedCandidates[0] as any).outcome = "winner";
+        }
       }
     });
   }
@@ -151,19 +178,15 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
               candidatesByCategory[category].length > 0 ? (
                 candidatesByCategory[category].map((candidate, index) => {
                   const isSingleCandidate = isSingleCandidateCategory(category);
-                  const isLeading =
-                    !isSingleCandidate &&
-                    index === 0 &&
-                    election.status === "COMPLETED" &&
-                    (candidate.voteFor || 0n) > 0n;
+                  const outcome = (candidate as any).outcome;
 
                   return (
                     <ElectionCandidateCard
                       key={candidate.matricNo}
                       candidate={candidate}
                       electionStatus={election.status}
-                      isLeading={isLeading}
                       isSingleCandidate={isSingleCandidate}
+                      outcome={outcome}
                     />
                   );
                 })

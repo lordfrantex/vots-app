@@ -2,7 +2,12 @@
 
 import * as React from "react";
 import { useState } from "react";
-import { TrendingUp, BarChart3, PieChart as PieChartIcon } from "lucide-react";
+import {
+  TrendingUp,
+  BarChart3,
+  PieChart as PieChartIcon,
+  Equal,
+} from "lucide-react";
 import {
   Label,
   Pie,
@@ -211,6 +216,19 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
 
       if (total === 0) return null;
 
+      // Check for tie in single candidate election
+      if (forVotes === againstVotes) {
+        return {
+          winner: candidate,
+          percentage: "50.0",
+          result: "tied",
+          forVotes,
+          againstVotes,
+          isSingleCandidate: true,
+          isTied: true,
+        };
+      }
+
       const result = forVotes > againstVotes ? "approved" : "rejected";
       const percentage = (
         (Math.max(forVotes, againstVotes) / total) *
@@ -224,23 +242,42 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
         forVotes,
         againstVotes,
         isSingleCandidate: true,
+        isTied: false,
       };
     }
 
-    const winner = candidates[0];
+    // Check for ties in multi-candidate elections
+    const highestVotes = candidates[0]?.voteCount || 0;
+    const winners = candidates.filter(
+      (c) => (c.voteCount || 0) === highestVotes,
+    );
     const totalCategoryVotes = candidates.reduce(
       (sum, c) => sum + (c.voteCount || 0),
       0,
     );
+
     const winnerPercentage =
       totalCategoryVotes > 0
-        ? (((winner.voteCount || 0) / totalCategoryVotes) * 100).toFixed(1)
+        ? ((highestVotes / totalCategoryVotes) * 100).toFixed(1)
         : "0";
 
+    if (winners.length > 1) {
+      // Multiple candidates tied for first place
+      return {
+        winners,
+        percentage: winnerPercentage,
+        isSingleCandidate: false,
+        isTied: true,
+        tiedCount: winners.length,
+      };
+    }
+
+    // Single winner
     return {
-      winner,
+      winner: winners[0],
       percentage: winnerPercentage,
       isSingleCandidate: false,
+      isTied: false,
     };
   };
 
@@ -318,27 +355,55 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
               <>
                 {winnerInfo.isSingleCandidate ? (
                   <div className="flex items-center gap-2 leading-none font-medium">
-                    <TrendingUp className="h-4 w-4" />
-                    <span
-                      className={
-                        winnerInfo.result === "approved"
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }
-                    >
-                      {winnerInfo.winner.name} {winnerInfo.result} with{" "}
-                      {winnerInfo.percentage}% (
-                      {winnerInfo.result === "approved"
-                        ? winnerInfo.forVotes
-                        : winnerInfo.againstVotes}{" "}
-                      votes)
-                    </span>
+                    {winnerInfo.isTied ? (
+                      <>
+                        <Equal className="h-4 w-4 text-yellow-600" />
+                        <span className="text-yellow-600">
+                          {winnerInfo.winner.name} tied with{" "}
+                          {winnerInfo.percentage}% ({winnerInfo.forVotes} for,{" "}
+                          {winnerInfo.againstVotes} against)
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="h-4 w-4" />
+                        <span
+                          className={
+                            winnerInfo.result === "approved"
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }
+                        >
+                          {winnerInfo.winner.name} {winnerInfo.result} with{" "}
+                          {winnerInfo.percentage}% (
+                          {winnerInfo.result === "approved"
+                            ? winnerInfo.forVotes
+                            : winnerInfo.againstVotes}{" "}
+                          votes)
+                        </span>
+                      </>
+                    )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 leading-none font-medium text-green-600">
-                    <TrendingUp className="h-4 w-4" />
-                    {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
-                    of votes
+                  <div className="flex items-center gap-2 leading-none font-medium">
+                    {winnerInfo.isTied ? (
+                      <>
+                        <Equal className="h-4 w-4 text-yellow-600" />
+                        <span className="text-yellow-600">
+                          {winnerInfo.tiedCount} candidates tied with{" "}
+                          {winnerInfo.percentage}% each (
+                          {winnerInfo.winners?.map((w) => w.name).join(", ")})
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span className="text-green-600">
+                          {winnerInfo.winner.name} leads with{" "}
+                          {winnerInfo.percentage}% of votes
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
                 <div className="text-muted-foreground leading-none text-center">
@@ -414,27 +479,55 @@ const ElectionChart: React.FC<ElectionChartProps> = ({
             <>
               {winnerInfo.isSingleCandidate ? (
                 <div className="flex gap-2 leading-none font-medium">
-                  <TrendingUp className="h-4 w-4" />
-                  <span
-                    className={
-                      winnerInfo.result === "approved"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }
-                  >
-                    {winnerInfo.winner.name} {winnerInfo.result} with{" "}
-                    {winnerInfo.percentage}% (
-                    {winnerInfo.result === "approved"
-                      ? winnerInfo.forVotes
-                      : winnerInfo.againstVotes}{" "}
-                    votes)
-                  </span>
+                  {winnerInfo.isTied ? (
+                    <>
+                      <Equal className="h-4 w-4 text-yellow-600" />
+                      <span className="text-yellow-600">
+                        {winnerInfo.winner.name} tied with{" "}
+                        {winnerInfo.percentage}% ({winnerInfo.forVotes} for,{" "}
+                        {winnerInfo.againstVotes} against)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp className="h-4 w-4" />
+                      <span
+                        className={
+                          winnerInfo.result === "approved"
+                            ? "text-green-600"
+                            : "text-red-600"
+                        }
+                      >
+                        {winnerInfo.winner.name} {winnerInfo.result} with{" "}
+                        {winnerInfo.percentage}% (
+                        {winnerInfo.result === "approved"
+                          ? winnerInfo.forVotes
+                          : winnerInfo.againstVotes}{" "}
+                        votes)
+                      </span>
+                    </>
+                  )}
                 </div>
               ) : (
-                <div className="flex gap-2 leading-none font-medium text-green-600">
-                  <TrendingUp className="h-4 w-4" />
-                  {winnerInfo.winner.name} leads with {winnerInfo.percentage}%
-                  of votes
+                <div className="flex gap-2 leading-none font-medium">
+                  {winnerInfo.isTied ? (
+                    <>
+                      <Equal className="h-4 w-4 text-yellow-600" />
+                      <span className="text-yellow-600">
+                        {winnerInfo.tiedCount} candidates tied with{" "}
+                        {winnerInfo.percentage}% each (
+                        {winnerInfo.winners?.map((w) => w.name).join(", ")})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span className="text-green-600">
+                        {winnerInfo.winner.name} leads with{" "}
+                        {winnerInfo.percentage}% of votes
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
               <div className="text-muted-foreground leading-none">

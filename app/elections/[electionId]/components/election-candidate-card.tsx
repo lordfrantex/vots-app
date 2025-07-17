@@ -1,40 +1,122 @@
 import React from "react";
 import { ContractCandidateInfoDTO } from "@/types/candidate";
-import { TrendingUp, Trophy, ThumbsUp, ThumbsDown, X } from "lucide-react";
+import {
+  TrendingUp,
+  Trophy,
+  ThumbsUp,
+  ThumbsDown,
+  X,
+  Equal,
+} from "lucide-react";
 import { FaUser } from "react-icons/fa6";
 
 const ElectionCandidateCard: React.FC<{
   candidate: ContractCandidateInfoDTO;
   electionStatus: string;
-  isLeading?: boolean;
   isSingleCandidate?: boolean;
-}> = ({
-  candidate,
-  electionStatus,
-  isLeading = false,
-  isSingleCandidate = false,
-}) => {
+  outcome?: string;
+}> = ({ candidate, electionStatus, isSingleCandidate = false, outcome }) => {
   const showActualVotes = electionStatus === "COMPLETED";
-  const showVoteCounts = electionStatus === "COMPLETED"; // Only show vote counts when completed
+  const showVoteCounts = electionStatus === "COMPLETED";
 
   const voteFor = candidate.voteFor || 0n;
   const voteAgainst = candidate.voteAgainst || 0n;
-  const isElected =
-    isSingleCandidate && showActualVotes ? voteFor > voteAgainst : false;
-  const isNotElected =
-    isSingleCandidate && showActualVotes ? voteAgainst >= voteFor : false;
 
   const getCardStyling = () => {
-    if (isSingleCandidate && showActualVotes) {
-      if (isElected) {
-        return "ring-2 ring-green-600 bg-gradient-to-br from-purple-50 to-orange-50/10 dark:from-blue-600/20 dark:via-70% dark:to-gray-950";
-      } else if (isNotElected) {
-        return "ring-2 ring-red-600 bg-gradient-to-br from-red-50 to-rose-50/10 dark:from-red-600/20 dark:via-70% dark:to-gray-950";
+    if (showActualVotes && outcome) {
+      switch (outcome) {
+        case "elected":
+        case "winner":
+          return "ring-2 ring-green-600 bg-gradient-to-br from-purple-50 to-orange-50/10 dark:from-blue-600/20 dark:via-70% dark:to-gray-950";
+        case "not_elected":
+          return "ring-2 ring-red-600 bg-gradient-to-br from-red-50 to-rose-50/10 dark:from-red-600/20 dark:via-70% dark:to-gray-950";
+        case "tied":
+          // No ring border for tied candidates
+          return "bg-gradient-to-br ";
+        default:
+          return "";
       }
-    } else if (isLeading && showActualVotes) {
-      return "ring-2 ring-green-600 bg-gradient-to-br from-purple-50 to-orange-50/10 dark:from-blue-600/20 dark:via-70% dark:to-gray-950";
     }
     return "";
+  };
+
+  const getStatusIcon = () => {
+    if (!showActualVotes || !outcome) return null;
+
+    switch (outcome) {
+      case "elected":
+      case "winner":
+        return (
+          <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-green-500 to-emerald-600 text-white rounded-full p-2 shadow-lg">
+            <Trophy size={16} />
+          </div>
+        );
+      case "not_elected":
+        return (
+          <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-red-500 to-rose-600 text-white rounded-full p-2 shadow-lg">
+            <X size={16} />
+          </div>
+        );
+      case "tied":
+        return (
+          <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-yellow-500 to-amber-600 text-white rounded-full p-2 shadow-lg">
+            <Equal size={16} />
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getStatusBadge = () => {
+    if (electionStatus === "UPCOMING") {
+      return (
+        <span className="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          Upcoming
+        </span>
+      );
+    }
+
+    if (electionStatus === "ACTIVE") {
+      return (
+        <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+          Voting Open
+        </span>
+      );
+    }
+
+    if (electionStatus === "COMPLETED" && outcome) {
+      switch (outcome) {
+        case "elected":
+          return (
+            <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-800/10">
+              Elected
+            </span>
+          );
+        case "winner":
+          return (
+            <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-800/10">
+              Winner
+            </span>
+          );
+        case "not_elected":
+          return (
+            <span className="inline-block px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-800/10">
+              Not Elected
+            </span>
+          );
+        case "tied":
+          return (
+            <span className="inline-block px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border border-yellow-800/10">
+              Tied
+            </span>
+          );
+        default:
+          return null;
+      }
+    }
+
+    return null;
   };
 
   return (
@@ -45,25 +127,7 @@ const ElectionCandidateCard: React.FC<{
     `}
     >
       {/* Winner/Status indicator */}
-      {showActualVotes && (
-        <>
-          {isLeading && !isSingleCandidate && (
-            <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-green-500 to-emerald-600 text-white rounded-full p-2 shadow-lg">
-              <Trophy size={16} />
-            </div>
-          )}
-          {isSingleCandidate && isElected && (
-            <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-green-500 to-emerald-600 text-white rounded-full p-2 shadow-lg">
-              <Trophy size={16} />
-            </div>
-          )}
-          {isSingleCandidate && isNotElected && (
-            <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-red-500 to-rose-600 text-white rounded-full p-2 shadow-lg">
-              <X size={16} />
-            </div>
-          )}
-        </>
-      )}
+      {getStatusIcon()}
 
       <div className="flex items-center justify-between mb-6">
         {/* Avatar */}
@@ -88,37 +152,7 @@ const ElectionCandidateCard: React.FC<{
           </div>
         </div>
 
-        <div>
-          {electionStatus === "UPCOMING" && (
-            <span className="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              Upcoming
-            </span>
-          )}
-          {electionStatus === "ACTIVE" && (
-            <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-              Voting Open
-            </span>
-          )}
-          {electionStatus === "COMPLETED" && (
-            <>
-              {isLeading && !isSingleCandidate && (
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-800/10">
-                  Winner
-                </span>
-              )}
-              {isSingleCandidate && isElected && (
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border border-green-800/10">
-                  Elected
-                </span>
-              )}
-              {isSingleCandidate && isNotElected && (
-                <span className="inline-block px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border border-red-800/10">
-                  Not Elected
-                </span>
-              )}
-            </>
-          )}
-        </div>
+        <div>{getStatusBadge()}</div>
       </div>
 
       {/* Vote Count Section */}
@@ -157,14 +191,19 @@ const ElectionCandidateCard: React.FC<{
               </div>
               <div
                 className={`text-2xl font-bold flex items-center justify-center gap-1 ${
-                  isLeading
+                  outcome === "winner"
                     ? "text-green-600 dark:text-green-400"
-                    : "text-yellow-600 dark:text-yellow-400"
+                    : outcome === "tied"
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : "text-gray-600 dark:text-gray-400"
                 }`}
               >
                 {voteFor.toString()}
-                {isLeading && (
+                {outcome === "winner" && (
                   <TrendingUp size={16} className="text-green-500" />
+                )}
+                {outcome === "tied" && (
+                  <Equal size={16} className="text-yellow-500" />
                 )}
               </div>
             </div>
