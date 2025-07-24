@@ -88,7 +88,7 @@ export const createCandidatesSchema = (validCategories: string[]) =>
             name: z
               .string()
               .min(2, "Candidate name must be at least 2 characters")
-              .max(500, "Candidate name must not exceed 50 characters")
+              .max(50, "Candidate name must not exceed 50 characters")
               .regex(
                 /^[a-zA-Z\s.-]+$/,
                 "Candidate name can only contain letters, spaces, dots, and hyphens",
