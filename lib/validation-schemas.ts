@@ -20,8 +20,7 @@ export const basicInfoSchema = z
     name: z
       .string()
       .min(3, "Election name must be at least 3 characters")
-      .max(50, "Election name must not exceed 50 characters")
-      .regex(/^[a-zA-Z0-9\s-_]+$/, "Election name contains invalid characters"),
+      .max(200, "Election name must not exceed 50 characters"),
     description: z
       .string()
       .min(10, "Description must be at least 10 characters")
@@ -56,12 +55,7 @@ export const categoriesSchema = z
           id: z.string(),
           name: z
             .string()
-            .min(2, "Category name must be at least 2 characters")
-            .max(30, "Category name must not exceed 30 characters")
-            .regex(
-              /^[a-zA-Z\s]+$/,
-              "Category name can only contain letters and spaces",
-            ),
+            .min(2, "Category name must be at least 2 characters"),
         }),
       )
       .min(1, "At least one position category is required"),
@@ -87,28 +81,17 @@ export const createCandidatesSchema = (validCategories: string[]) =>
             id: z.string(),
             name: z
               .string()
-              .min(2, "Candidate name must be at least 2 characters")
-              .max(50, "Candidate name must not exceed 50 characters")
-              .regex(
-                /^[a-zA-Z\s.-]+$/,
-                "Candidate name can only contain letters, spaces, dots, and hyphens",
-              ),
+              .min(2, "Candidate name must be at least 2 characters"),
             matricNo: z
               .string()
-              .min(3, "Matric number must be at least 3 characters")
-              .max(20, "Matric number must not exceed 20 characters")
-              .regex(
-                /^[a-zA-Z0-9/-_]+$/,
-                "Matric number can only contain letters, numbers, hyphens, forward slash, and underscores",
-              ),
+              .min(3, "Matric number must be at least 3 characters"),
             category: z.enum(validCategories as [string, ...string[]], {
               errorMap: () => ({ message: "Please select a valid category" }),
             }),
             photo: z.string().optional(),
           }),
         )
-        .min(1, "At least one candidate is required")
-        .max(100, "Maximum 100 candidates allowed"),
+        .min(1, "At least one candidate is required"),
     })
     .refine(
       (data) => {
@@ -183,24 +166,11 @@ export const votersSchema = z
       .array(
         z.object({
           id: z.string(),
-          name: z
-            .string()
-            .min(2, "Voter name must be at least 2 characters")
-            .max(50, "Voter name must not exceed 50 characters")
-            .regex(/^[a-zA-Z\s.-]+$/, "Voter name contains invalid characters"),
+          name: z.string().min(2, "Voter name must be at least 2 characters"),
           matricNumber: z
             .string()
-            .min(3, "Matric number must be at least 3 characters")
-            .max(20, "Matric number must not exceed 20 characters")
-            .regex(
-              /^[a-zA-Z0-9/-]+$/,
-              "Matric number contains invalid characters",
-            ),
-          level: z
-            .string()
-            .min(1, "Level is required") // Make it required instead of optional
-            .max(10, "Level must not exceed 10 characters")
-            .regex(/^[0-9]+$/, "Level must be a number"),
+            .min(3, "Matric number must be at least 3 characters"),
+          level: z.string().min(1, "Level is required"),
           department: z
             .string()
             .max(50, "Department name must not exceed 50 characters")
