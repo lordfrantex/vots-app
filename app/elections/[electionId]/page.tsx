@@ -239,46 +239,79 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
   const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
 
-    // Create sets for efficient lookup
-    const accreditedIds = new Set(
-      election.accreditedVoters?.map((v) => v.id) || [],
-    );
+    // console.log("=== ENHANCED VOTERS DEBUG ===");
+    // console.log("Total voters:", election.voters.length);
+    // console.log(
+    //   "Total accredited voters:",
+    //   election.accreditedVoters?.length || 0,
+    // );
 
-    // Get voted voters from accreditedVoters array (they have the hasVoted info)
-    const votedIds = new Set(
-      election.accreditedVoters
-        ?.filter((v) => v.hasVoted === true || v.voterState === 3)
-        .map((v) => v.id) || [],
-    );
+    // Use name-based matching instead of ID matching
+    // since the IDs don't match between voters and accreditedVoters arrays
+    const accreditedByName = new Map();
+    const votedByName = new Map();
 
-    // console.log("Accredited IDs:", accreditedIds);
-    // console.log("Voted IDs:", votedIds);
-    // console.log("AccreditedVoters with vote info:", election.accreditedVoters);
+    // Process accredited voters array
+    (election.accreditedVoters || []).forEach((voter) => {
+      if (voter && voter.name) {
+        // Store the accredited voter info by name
+        accreditedByName.set(voter.name, voter);
 
-    return election.voters.map((voter) => {
-      // Check if voter is in accredited array
-      const isInAccreditedArray = accreditedIds.has(voter.id);
+        // Check if they voted (using multiple conditions)
+        const hasVoted =
+          voter.hasVoted === true ||
+          voter.voterState === 3 ||
+          (voter.isAccredited === true && voter.hasVoted !== false);
 
-      // Check if voter has voted (from accreditedVoters array)
-      const hasVoted = votedIds.has(voter.id);
-
-      // A voter is accredited if they're in the accreditedVoters array
-      const isAccredited = isInAccreditedArray;
-
-      return {
-        id: voter.id,
-        name: voter.name,
-        matricNumber: voter.matricNumber,
-        department: voter.department,
-        level: voter.level ? Number(voter.level) : undefined,
-        isAccredited,
-        hasVoted,
-        isRegistered: true, // All voters in the array are registered
-        photo: "/placeholder-user.jpg",
-        accreditedAt: isAccredited ? new Date().toISOString() : undefined,
-        votedAt: hasVoted ? new Date().toISOString() : undefined,
-      };
+        if (hasVoted) {
+          votedByName.set(voter.name, true);
+        }
+      }
     });
+
+    // console.log("Accredited by name map size:", accreditedByName.size);
+    // console.log("Voted by name map size:", votedByName.size);
+    // console.log("Accredited names:", Array.from(accreditedByName.keys()));
+    // console.log("Voted names:", Array.from(votedByName.keys()));
+
+    const enhanced = election.voters
+      .map((voter) => {
+        if (!voter || !voter.name) {
+          console.warn("Invalid voter object:", voter);
+          return null;
+        }
+
+        // Match by name instead of ID
+        const accreditedVoter = accreditedByName.get(voter.name);
+        const isAccredited = !!accreditedVoter;
+        const hasVoted = votedByName.has(voter.name);
+
+        return {
+          id: voter.id,
+          name: voter.name,
+          matricNumber: voter.matricNumber,
+          department: voter.department,
+          level: voter.level ? Number(voter.level) : undefined,
+          isAccredited,
+          hasVoted,
+          isRegistered: true,
+          photo: "/placeholder-user.jpg",
+          accreditedAt: isAccredited ? new Date().toISOString() : undefined,
+          votedAt: hasVoted ? new Date().toISOString() : undefined,
+        };
+      })
+      .filter(Boolean);
+
+    // console.log("Enhanced voters sample:", enhanced.slice(0, 3));
+    // console.log("Stats:", {
+    //   total: enhanced.length,
+    //   accredited: enhanced.filter((v) => v.isAccredited).length,
+    //   voted: enhanced.filter((v) => v.hasVoted).length,
+    //   unaccredited: enhanced.filter((v) => !v.isAccredited).length,
+    // });
+    // console.log("=== END DEBUG ===");
+
+    return enhanced;
   }, [election?.voters, election?.accreditedVoters]);
 
   // Updated tabFilteredVoters logic
@@ -296,8 +329,6 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
         return enhancedVoters;
     }
   }, [activeTab, enhancedVoters]);
-
-  // console.log("Tab filtered voters:", tabFilteredVoters);
 
   const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
     null,

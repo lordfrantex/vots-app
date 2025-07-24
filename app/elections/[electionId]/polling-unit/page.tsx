@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use, useEffect } from "react";
+import { useState, use, useEffect, useMemo } from "react";
 import { useAccount } from "wagmi";
 
 import VoterAuthenticationModal from "./components/voter-authentication-modal";
@@ -43,6 +43,15 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
   const { election: electionDetails } = useElectionDetails(electionId);
   const { session, isSessionValid, clearSession } = usePollingUnitSession();
 
+  const pollRoleName = useMemo(() => {
+    return (
+      electionDetails?.pollingUnits.find(
+        (unit) =>
+          unit.address?.pollAddress === session.walletClient.account.address,
+      )?.address?.pollRoleName || "Unknown Role"
+    );
+  }, [electionDetails?.pollingUnits, address]);
+
   useEffect(() => {
     if (electionDetails?.status === "COMPLETED") {
       // console.log("Election has ended, clearing session");
@@ -83,7 +92,7 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
         const walletAddress = session.walletClient.account.address;
         setPollingUnit({
           unitId: `unit-${walletAddress.slice(-6)}`,
-          unitName: `Polling Unit ${walletAddress.slice(-6)}`,
+          unitName: pollRoleName,
           address: walletAddress,
         });
       }

@@ -146,8 +146,8 @@ export function PollingUnitValidationModal({
         <DialogHeader>
           <DialogTitle>Polling Unit Validation</DialogTitle>
           <p className="text-sm text-slate-500 mt-2">
-            Connect your authorized wallet to access the polling officer
-            dashboard for {electionName ? electionName : "this election"}.
+            Connect your authorized wallet to access the polling unit for{" "}
+            {electionName ? electionName : "this election"}.
           </p>
         </DialogHeader>
         <div className="space-y-4 mt-6">

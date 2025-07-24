@@ -22,7 +22,6 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
-import { useValidateVoterForVoting } from "@/hooks/use-election-write-operations";
 import { useSessionValidateVoter } from "@/hooks/use-session-validate-voter";
 
 interface VoterAuthenticationModalProps {
