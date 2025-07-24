@@ -27,6 +27,14 @@ export function DashboardHeader({
   const turnoutPercentage =
     accreditedCount > 0 ? Math.round((votedCount / accreditedCount) * 100) : 0;
 
+  const votersturnoutPercentage =
+    (election?.totalVoters ?? 0) > 0
+      ? (
+          ((election?.totalVotes ?? 0) / (election.totalVoters ?? 1)) *
+          100
+        ).toFixed(1)
+      : "0.0";
+
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
@@ -115,10 +123,10 @@ export function DashboardHeader({
                 <div>
                   <p className="text-sm text-slate-400">Voted</p>
                   <p className="text-2xl font-bold text-slate-500 dark:text-slate-300">
-                    {votedCount.toLocaleString()}
+                    {(election?.totalVotes ?? 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {turnoutPercentage}% turnout
+                    {votersturnoutPercentage}% turnout
                   </p>
                 </div>
               </div>
