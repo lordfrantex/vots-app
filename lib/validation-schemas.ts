@@ -20,11 +20,11 @@ export const basicInfoSchema = z
     name: z
       .string()
       .min(3, "Election name must be at least 3 characters")
-      .max(200, "Election name must not exceed 50 characters"),
+      .max(300, "Election name must not exceed 50 characters"),
     description: z
       .string()
       .min(10, "Description must be at least 10 characters")
-      .max(100, "Description must not exceed 100 characters"),
+      .max(900, "Description must not exceed 100 characters"),
     startDate: dateTimeSchema,
     endDate: dateTimeSchema,
     timezone: z.string().min(1, "Timezone is required"),
@@ -55,10 +55,16 @@ export const categoriesSchema = z
           id: z.string(),
           name: z
             .string()
-            .min(2, "Category name must be at least 2 characters"),
+            .min(2, "Category name must be at least 2 characters")
+            .max(400, "Category name must not exceed 30 characters")
+            .regex(
+              /^[a-zA-Z\s]+$/,
+              "Category name can only contain letters and spaces",
+            ),
         }),
       )
-      .min(1, "At least one position category is required"),
+      .min(1, "At least one position category is required")
+      .max(100, "Maximum 10 categories allowed"),
   })
   .refine(
     (data) => {
@@ -81,17 +87,28 @@ export const createCandidatesSchema = (validCategories: string[]) =>
             id: z.string(),
             name: z
               .string()
-              .min(2, "Candidate name must be at least 2 characters"),
+              .min(2, "Candidate name must be at least 2 characters")
+              .max(500, "Candidate name must not exceed 50 characters")
+              .regex(
+                /^[a-zA-Z\s.-]+$/,
+                "Candidate name can only contain letters, spaces, dots, and hyphens",
+              ),
             matricNo: z
               .string()
-              .min(3, "Matric number must be at least 3 characters"),
+              .min(3, "Matric number must be at least 3 characters")
+              .max(400, "Matric number must not exceed 20 characters")
+              .regex(
+                /^[a-zA-Z0-9/-_]+$/,
+                "Matric number can only contain letters, numbers, hyphens, forward slash, and underscores",
+              ),
             category: z.enum(validCategories as [string, ...string[]], {
               errorMap: () => ({ message: "Please select a valid category" }),
             }),
             photo: z.string().optional(),
           }),
         )
-        .min(1, "At least one candidate is required"),
+        .min(1, "At least one candidate is required")
+        .max(100, "Maximum 100 candidates allowed"),
     })
     .refine(
       (data) => {
@@ -146,7 +163,7 @@ export const createCandidatesSchema = (validCategories: string[]) =>
         });
 
         // Allow up to 20 candidates per category
-        const maxCandidatesPerCategory = 20;
+        const maxCandidatesPerCategory = 100;
         const overloadedCategories = Object.entries(categoryCount)
           .filter(([, count]) => count > maxCandidatesPerCategory)
           .map(([category]) => category);
@@ -166,14 +183,27 @@ export const votersSchema = z
       .array(
         z.object({
           id: z.string(),
-          name: z.string().min(2, "Voter name must be at least 2 characters"),
+          name: z
+            .string()
+            .min(2, "Voter name must be at least 2 characters")
+            .max(500, "Voter name must not exceed 50 characters")
+            .regex(/^[a-zA-Z\s.-]+$/, "Voter name contains invalid characters"),
           matricNumber: z
             .string()
-            .min(3, "Matric number must be at least 3 characters"),
-          level: z.string().min(1, "Level is required"),
+            .min(3, "Matric number must be at least 3 characters")
+            .max(200, "Matric number must not exceed 20 characters")
+            .regex(
+              /^[a-zA-Z0-9/-]+$/,
+              "Matric number contains invalid characters",
+            ),
+          level: z
+            .string()
+            .min(1, "Level is required") // Make it required instead of optional
+            .max(100, "Level must not exceed 10 characters")
+            .regex(/^[0-9]+$/, "Level must be a number"),
           department: z
             .string()
-            .max(50, "Department name must not exceed 50 characters")
+            .max(500, "Department name must not exceed 50 characters")
             .optional()
             .or(z.literal("")),
         }),
@@ -205,11 +235,11 @@ export const pollingSetupSchema = z.object({
         name: z
           .string()
           .min(2, "Unit name must be at least 2 characters")
-          .max(30, "Unit name must not exceed 30 characters"),
+          .max(300, "Unit name must not exceed 30 characters"),
       }),
     )
     .min(1, "At least one polling officer is required")
-    .max(20, "Maximum 20 polling officers allowed"),
+    .max(200, "Maximum 20 polling officers allowed"),
   pollingUnits: z
     .array(
       z.object({
@@ -218,11 +248,11 @@ export const pollingSetupSchema = z.object({
         name: z
           .string()
           .min(2, "Unit name must be at least 2 characters")
-          .max(30, "Unit name must not exceed 30 characters"),
+          .max(300, "Unit name must not exceed 30 characters"),
       }),
     )
     .min(1, "At least one polling unit is required")
-    .max(50, "Maximum 50 polling units allowed"),
+    .max(500, "Maximum 50 polling units allowed"),
 });
 
 // Complete Election Schema (for final validation)
