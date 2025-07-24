@@ -64,8 +64,7 @@ export const categoriesSchema = z
             ),
         }),
       )
-      .min(1, "At least one position category is required")
-      .max(10, "Maximum 10 categories allowed"),
+      .min(1, "At least one position category is required"),
   })
   .refine(
     (data) => {
