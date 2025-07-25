@@ -137,6 +137,26 @@ export const abi = [
   },
   {
     inputs: [
+      { internalType: "uint256", name: "electionTokenId", type: "uint256" },
+      {
+        components: [
+          { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "matricNo", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
+        ],
+        internalType: "struct IElection.VoterInfoDTO[]",
+        name: "votersList",
+        type: "tuple[]",
+      },
+    ],
+    name: "addVotersToElection",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
       {
         components: [
           { internalType: "uint256", name: "startTimeStamp", type: "uint256" },
@@ -153,17 +173,6 @@ export const abi = [
             ],
             internalType: "struct IElection.CandidateInfoDTO[]",
             name: "candidatesList",
-            type: "tuple[]",
-          },
-          {
-            components: [
-              { internalType: "string", name: "name", type: "string" },
-              { internalType: "string", name: "matricNo", type: "string" },
-              { internalType: "string", name: "department", type: "string" },
-              { internalType: "uint256", name: "level", type: "uint256" },
-            ],
-            internalType: "struct IElection.VoterInfoDTO[]",
-            name: "votersList",
             type: "tuple[]",
           },
           {

@@ -129,30 +129,31 @@ const ElectionCandidateCard: React.FC<{
       {/* Winner/Status indicator */}
       {getStatusIcon()}
 
-      <div className="flex items-center justify-between mb-6">
-        {/* Avatar */}
-        <div className="flex gap-3 items-center justify-center">
-          <div
-            className={`
-          w-16 h-16 rounded-full bg-gradient-to-b dark:from-blue-500/30 dark:via-55% dark:to-gray-900 border border-gray-500/30
-          flex items-center justify-center text-white font-bold text-lg mb-3
-          shadow-2xl
-        `}
-          >
-            <FaUser size={24} className="text-indigo-400/40" />
-          </div>
+      {/* Status Badge - positioned at top right */}
+      <div className="flex justify-end mb-3">{getStatusBadge()}</div>
 
-          <div className="flex flex-col items-start gap-1">
-            <h3 className="font-bold text-base text-gray-900 dark:text-white text-center">
-              {candidate.name}
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-              {candidate.matricNo}
-            </p>
-          </div>
+      {/* Candidate Info Section */}
+      <div className="flex gap-3 items-center mb-6">
+        {/* Avatar */}
+        <div
+          className={`
+          w-16 h-16 rounded-full bg-gradient-to-b dark:from-blue-500/30 dark:via-55% dark:to-gray-900 border border-gray-500/30
+          flex items-center justify-center text-white font-bold text-lg
+          shadow-2xl flex-shrink-0
+        `}
+        >
+          <FaUser size={24} className="text-indigo-400/40" />
         </div>
 
-        <div>{getStatusBadge()}</div>
+        {/* Name and Matric Info - allows natural wrapping */}
+        <div className="flex flex-col items-start gap-1 min-w-0 flex-1">
+          <h3 className="font-bold text-base text-gray-900 dark:text-white leading-tight break-words">
+            {candidate.name}
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 break-all">
+            {candidate.matricNo}
+          </p>
+        </div>
       </div>
 
       {/* Vote Count Section */}

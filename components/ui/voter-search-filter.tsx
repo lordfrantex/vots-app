@@ -182,7 +182,7 @@ const VoterSearchFilter: React.FC<VoterSearchFilterProps> = ({
         {/* Status Filter Buttons */}
         {statusButtons.length > 0 && (
           <div
-            className={`flex ${compact ? "flex-wrap" : "flex-col sm:flex-row"} gap-2`}
+            className={`flex flex-wrap ${compact ? "flex-wrap" : "flex-col sm:flex-row"} gap-2`}
           >
             {statusButtons.map(({ key, label, count, icon: Icon }) => (
               <Button

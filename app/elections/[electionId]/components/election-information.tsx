@@ -112,7 +112,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
           onClick={() =>
             router.push(`/elections/${electionId}/polling-officer`)
           }
-          disabled={!accessPolling}
+          // disabled={!accessPolling}
         >
           <Shield className="w-5 h-5" />
           <span className="font-medium">Access Polling Officer Panel</span>
@@ -123,7 +123,7 @@ const ElectionInformation: React.FC<ElectionInformationProps> = ({
           size="lg"
           className="text-gray-500 dark:text-gray-400 p-4 text-center flex items-center bg-[#D6DADD]/30 hover:bg-[#D6DADD]/80 dark:bg-gray-700/50 dark:hover:bg-slate-700 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl cursor-pointer"
           onClick={() => router.push(`/elections/${electionId}/polling-unit`)}
-          disabled={!accessPolling}
+          // disabled={!accessPolling}
         >
           <MapPin className="w-5 h-5" />
           <span className="font-medium">Access Polling Unit</span>

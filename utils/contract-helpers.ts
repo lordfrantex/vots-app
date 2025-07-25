@@ -390,9 +390,8 @@ export function validateContractElectionParams(
       });
     }
 
-    if (!params.votersList || params.votersList.length === 0) {
-      errors.push("At least one voter is required");
-    } else {
+    // Validate individual voters ONLY if the list exists (even if empty)
+    if (params.votersList) {
       params.votersList.forEach((voter, index) => {
         if (!voter.name || voter.name.trim().length === 0) {
           errors.push(`Voter ${index + 1}: Name is required`);

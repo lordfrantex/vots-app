@@ -30,6 +30,7 @@ interface VotersFormProps {
   onToggle: () => void;
   canAccess: boolean;
   isValid: boolean;
+  showSubmitButton?: boolean; // Add this optional prop
 }
 
 export function VotersForm({
@@ -316,20 +317,6 @@ export function VotersForm({
                 className="hidden"
               />
 
-              <div className="text-sm text-gray-400">
-                <p className="mb-2">CSV Format Requirements:</p>
-                <ul className="list-disc list-inside space-y-1 text-xs">
-                  <li>
-                    <strong>Required columns:</strong> name, matricnumber
-                  </li>
-                  <li>
-                    <strong>Optional columns:</strong> level, department
-                  </li>
-                  <li>Maximum 10,000 voters per upload</li>
-                  <li>Matric numbers must be unique</li>
-                </ul>
-              </div>
-
               {csvError && (
                 <Alert className="border-red-500/30 bg-red-500/10 mt-4">
                   <AlertCircle className="h-4 w-4 text-red-400" />
@@ -386,7 +373,7 @@ export function VotersForm({
                 <div className="overflow-x-auto">
                   <div className="max-h-96 overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-blue-950/30 dark:bg-slate-800/90 backdrop-blur-sm border-b border-white/10">
+                      <thead className="sticky top-0 bg-gray-400 dark:bg-slate-800/90 backdrop-blur-xl border-b border-white/10">
                         <tr>
                           <th className="text-left p-3 text-gray-100 dark:text-gray-300 font-medium min-w-[50px]">
                             #

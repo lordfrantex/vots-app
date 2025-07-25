@@ -155,13 +155,13 @@ const ElectionCandidates: React.FC<ElectionCandidatesProps> = ({
       </div>
 
       <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-        <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50">
+        <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50 flex flex-wrap mb-8 w-fit">
           {categoryNames.map((category) => (
             <TabsTrigger
               key={category}
               value={category}
               className={cn(
-                "bg-gray-50 dark:bg-[#0F172C] text-gray-400 dark:text-[#697AA1] font-medium cursor-pointer",
+                "bg-gray-50 dark:bg-[#0F172C] text-gray-400 dark:text-[#697AA1] font-medium cursor-pointer w-fit",
                 activeCategory === category &&
                   "font-bold text-white data-[state=active]:bg-indigo-600 data-[state=active]:bg-gradient-to-tr from-[#254192] to-[#192E69]",
               )}

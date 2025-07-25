@@ -13,7 +13,10 @@ import {
   electionAddress,
   SUPPORTED_CHAINS,
 } from "@/contracts/election-address";
-import type { ContractElectionParams } from "@/utils/contract-helpers";
+import type {
+  ContractElectionParams,
+  ContractVoterInfoDTO,
+} from "@/utils/contract-helpers";
 import type { Address, PublicClient, WalletClient } from "viem";
 import { Voter } from "@/types/voter";
 import { usePollingUnitSession } from "./use-polling-unit-session";
@@ -191,6 +194,160 @@ export function useCreateElection() {
     chainId,
     contractAddress: getContractAddress(chainId),
     isChainSupported: validateChainSupport(chainId).isSupported,
+  };
+}
+
+// Add this hook to use-election-write-operations.ts
+export function useAddVotersToElection() {
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const {
+    writeContractAsync,
+    data: hash,
+    isPending,
+    error: writeError,
+  } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const addVotersToElection = useCallback(
+    async (
+      electionTokenId: bigint,
+      votersList: ContractVoterInfoDTO[],
+    ): Promise<{ success: boolean; message: string; hash?: string }> => {
+      if (!address) {
+        return { success: false, message: "Please connect your wallet first" };
+      }
+
+      // Validate input data
+      if (!votersList || votersList.length === 0) {
+        return { success: false, message: "No voters provided" };
+      }
+
+      if (votersList.length > 10000) {
+        return {
+          success: false,
+          message: "Too many voters. Maximum is 10,000 per batch",
+        };
+      }
+
+      // Validate chain support
+      const chainValidation = validateChainSupport(chainId);
+      if (!chainValidation.isSupported) {
+        return { success: false, message: chainValidation.message! };
+      }
+
+      // Get contract address
+      const contractAddress = getContractAddress(chainId);
+      if (!contractAddress) {
+        return {
+          success: false,
+          message: "Contract not deployed on this network",
+        };
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        console.log("Adding voters to election:", {
+          electionTokenId: electionTokenId.toString(),
+          votersCount: votersList.length,
+          contractAddress,
+          chainId,
+        });
+
+        // Validate voter data structure
+        for (const voter of votersList) {
+          if (!voter.name || !voter.matricNo || !voter.department) {
+            throw new Error("Invalid voter data: missing required fields");
+          }
+        }
+
+        const transactionHash = await writeContractAsync({
+          abi,
+          address: contractAddress,
+          functionName: "addVotersToElection",
+          args: [electionTokenId, votersList],
+        });
+
+        console.log("Transaction submitted:", transactionHash);
+
+        return {
+          success: true,
+          message: `Transaction submitted! Adding ${votersList.length} voters. Please wait for confirmation.`,
+          hash: transactionHash,
+        };
+      } catch (err) {
+        console.error("Add voters error:", err);
+
+        let errorMessage = "Failed to add voters";
+
+        if (err instanceof Error) {
+          const errorMsg = err.message.toLowerCase();
+
+          if (
+            errorMsg.includes("user rejected") ||
+            errorMsg.includes("user denied")
+          ) {
+            errorMessage = "Transaction was rejected by user";
+          } else if (errorMsg.includes("insufficient funds")) {
+            errorMessage = "Insufficient funds for gas fees";
+          } else if (
+            errorMsg.includes("electionnonfound") ||
+            errorMsg.includes("election not found")
+          ) {
+            errorMessage = "Election not found";
+          } else if (
+            errorMsg.includes("unauthorized") ||
+            errorMsg.includes("not authorized")
+          ) {
+            errorMessage =
+              "You are not authorized to add voters to this election";
+          } else if (
+            errorMsg.includes("invalid voter") ||
+            errorMsg.includes("duplicate")
+          ) {
+            errorMessage = "Invalid or duplicate voter data detected";
+          } else if (errorMsg.includes("election state")) {
+            errorMessage =
+              "Election is not in a state that allows adding voters";
+          } else if (errorMsg.includes("gas")) {
+            errorMessage =
+              "Transaction failed due to gas issues. Try increasing gas limit.";
+          } else {
+            // Log the full error for debugging
+            console.error("Full error details:", err);
+            errorMessage = `Transaction failed: ${err.message}`;
+          }
+        }
+
+        setError(errorMessage);
+        return { success: false, message: errorMessage };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [address, chainId, writeContractAsync],
+  );
+
+  return {
+    addVotersToElection,
+    isLoading: isLoading || isPending || isConfirming,
+    isSuccess,
+    error: error || writeError?.message,
+    hash,
+    isPending,
+    isConfirming,
+    // Helper methods for debugging
+    isTransactionPending: isPending,
+    isTransactionConfirming: isConfirming,
+    isTransactionSuccess: isSuccess,
   };
 }
 // ENHANCED Hook for accrediting voters with validation

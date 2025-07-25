@@ -24,6 +24,8 @@ const ElectionClient: React.FC = () => {
   const { elections, isLoading } = useContractElections();
   const setElections = useElectionStore((state) => state.setElections);
 
+  console.log("Fetched elections:", elections);
+
   useEffect(() => {
     if (elections && elections.length > 0) {
       setElections(elections);
@@ -49,7 +51,7 @@ const ElectionClient: React.FC = () => {
     // First filter: Only show elections with ID > 5
     let filtered = elections.filter((election) => {
       const electionId = parseInt(election.id);
-      return electionId > 7;
+      return electionId;
     });
 
     // Apply search filter
@@ -99,7 +101,7 @@ const ElectionClient: React.FC = () => {
     // Filter elections with ID > 7 first
     const eligibleElections = elections.filter((election) => {
       const electionId = parseInt(election.id);
-      return electionId > 7;
+      return electionId;
     });
 
     return {
