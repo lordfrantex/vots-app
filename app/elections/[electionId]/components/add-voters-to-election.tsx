@@ -257,7 +257,7 @@ export function AddVotersToElection({
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Add Voters to Election</DialogTitle>
             <DialogDescription>
-              Add voters in batches. You can add up to 10,000 voters per batch.
+              Add voters in batches. You can add up to 100 voters per batch.
               Each voter must have a unique matric number.
             </DialogDescription>
           </DialogHeader>
