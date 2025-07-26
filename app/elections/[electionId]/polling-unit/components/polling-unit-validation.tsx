@@ -28,6 +28,7 @@ import { CustomConnectButton } from "@/components/ui/custom-connect-button";
 import { injected } from "wagmi/connectors";
 import { privateKeyToAccount } from "viem/accounts";
 import { Hex } from "viem";
+import { useRouter } from "next/navigation";
 
 interface PollingUnitWalletModalProps {
   isOpen: boolean;
@@ -48,6 +49,8 @@ export function PollingUnitValidationModal({
   const [validationResult, setValidationResult] = useState<boolean | null>(
     null,
   );
+
+  const router = useRouter();
 
   const [validationHash, setValidationHash] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
@@ -274,7 +277,9 @@ export function PollingUnitValidationModal({
                     </div>
                   )}
                   <Button
-                    onClick={onClose}
+                    onClick={() =>
+                      router.push(`/elections/${electionId}/polling-unit`)
+                    }
                     variant="default"
                     className="w-full cursor-pointer bg-green-600 hover:bg-green-700"
                   >
