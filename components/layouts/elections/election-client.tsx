@@ -24,8 +24,6 @@ const ElectionClient: React.FC = () => {
   const { elections, isLoading } = useContractElections();
   const setElections = useElectionStore((state) => state.setElections);
 
-  console.log("Fetched elections:", elections);
-
   useEffect(() => {
     if (elections && elections.length > 0) {
       setElections(elections);

@@ -255,12 +255,12 @@ export function useAddVotersToElection() {
       setError(null);
 
       try {
-        console.log("Adding voters to election:", {
-          electionTokenId: electionTokenId.toString(),
-          votersCount: votersList.length,
-          contractAddress,
-          chainId,
-        });
+        // console.log("Adding voters to election:", {
+        //   electionTokenId: electionTokenId.toString(),
+        //   votersCount: votersList.length,
+        //   contractAddress,
+        //   chainId,
+        // });
 
         // Validate voter data structure
         for (const voter of votersList) {
@@ -275,8 +275,8 @@ export function useAddVotersToElection() {
           functionName: "addVotersToElection",
           args: [electionTokenId, votersList],
         });
-
-        console.log("Transaction submitted:", transactionHash);
+        //
+        // console.log("Transaction submitted:", transactionHash);
 
         return {
           success: true,

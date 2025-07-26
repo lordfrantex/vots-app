@@ -42,8 +42,6 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
   // Convert election.id to bigint for the component
   const electionTokenId = BigInt(election.id);
 
-  console.log(election);
-
   return (
     <div
       className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg shadow-xl
