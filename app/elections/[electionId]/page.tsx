@@ -43,8 +43,6 @@ const ElectionPage: React.FC<ElectionPageProps> = ({ params }) => {
     refetch,
   } = useElectionDetails(electionId);
 
-  console.log("Election", contractElection);
-
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoRefreshedRef = useRef(false);
 
