@@ -8,6 +8,7 @@ import VotingPage from "./components/voting-page";
 import { usePollingUnitSession } from "@/hooks/use-polling-unit-session";
 import { PollingUnitValidationModal } from "@/app/elections/[electionId]/polling-unit/components/polling-unit-validation";
 import { useElectionDetails } from "@/hooks/use-contract-address";
+import { redirect } from "next/navigation";
 
 interface AuthenticatedVoter {
   name: string;
@@ -47,8 +48,8 @@ export default function PollingUnitPage({ params }: PollingUnitPageProps) {
     if (electionDetails?.status === "COMPLETED") {
       // console.log("Election has ended, clearing session");
       clearSession();
-      // Redirect to election page
-      window.location.href = `/elections`;
+      // Redirect to elections page
+      redirect("/elections");
     }
   }, [electionDetails, electionId, clearSession]);
 
