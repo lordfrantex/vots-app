@@ -231,7 +231,7 @@ const ElectionResult: React.FC<ElectionResultProps> = ({
             value={activeCategory}
             onValueChange={handleCategoryChange}
           >
-            <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50">
+            <TabsList className="gap-4 bg-transparent dark:bg-[#0F172C] shadow-2xl/10 shadow-amber-50 flex flex-wrap mb-12 w-fit">
               {election.categories.map((category) => (
                 <TabsTrigger
                   key={category.id}
