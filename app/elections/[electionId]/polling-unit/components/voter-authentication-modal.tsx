@@ -255,7 +255,7 @@ const VoterAuthenticationModal = ({
                 <Input
                   id="surname"
                   type="text"
-                  placeholder="Enter your surname only (e.g David)"
+                  placeholder="Enter your surname in CAPS (e.g ADEFISAN)"
                   value={surname}
                   onChange={(e) => setSurname(e.target.value)}
                   className="pl-10 bg-slate-300/20 dark:bg-slate-800/50 dark:border-slate-600 placeholder-slate-400"
