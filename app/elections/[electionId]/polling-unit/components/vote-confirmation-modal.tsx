@@ -46,7 +46,7 @@ const VoteConfirmationModal = ({
 }: VoteConfirmationModalProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-slate-200/70 dark:border-slate-700/50 text-slate-900 dark:text-white max-w-md">
+      <DialogContent className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-slate-200/70 dark:border-slate-700/50 text-slate-900 dark:text-white max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center text-xl text-slate-900 dark:text-white">
             Confirm Your Vote

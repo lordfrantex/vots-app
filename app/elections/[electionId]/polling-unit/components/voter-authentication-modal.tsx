@@ -298,7 +298,7 @@ const VoterAuthenticationModal = ({
               <Button
                 onClick={onBack}
                 variant="outline"
-                className="flex-1 bg-transparent"
+                className="flex-1 bg-transparent hidden"
                 disabled={isProcessing}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />

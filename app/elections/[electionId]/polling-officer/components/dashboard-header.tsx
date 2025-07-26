@@ -75,7 +75,11 @@ export function DashboardHeader({
               <Badge className={getStatusColor(election.status)}>
                 {election.status}
               </Badge>
-              <ElectionCountdownTimer endDate={election.endDate} />
+              <ElectionCountdownTimer
+                startDate={election.startDate}
+                endDate={election.endDate}
+                status={election.status}
+              />
             </div>
           </div>
         </CardHeader>

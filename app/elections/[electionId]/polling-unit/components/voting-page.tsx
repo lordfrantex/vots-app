@@ -393,7 +393,11 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                     Election closes in
                   </span>
                 </div>
-                <ElectionCountdownTimer endDate={election.endDate} />
+                <ElectionCountdownTimer
+                  startDate={election.startDate}
+                  endDate={election.endDate}
+                  status={election.status}
+                />
               </div>
 
               {/* Progress */}
