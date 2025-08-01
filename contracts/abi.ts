@@ -137,6 +137,26 @@ export const abi = [
   },
   {
     inputs: [
+      { internalType: "uint256", name: "electionTokenId", type: "uint256" },
+      {
+        components: [
+          { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "matricNo", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
+        ],
+        internalType: "struct IElection.VoterInfoDTO[]",
+        name: "votersList",
+        type: "tuple[]",
+      },
+    ],
+    name: "addVotersToElection",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
       {
         components: [
           { internalType: "uint256", name: "startTimeStamp", type: "uint256" },
@@ -157,22 +177,21 @@ export const abi = [
           },
           {
             components: [
-              { internalType: "string", name: "name", type: "string" },
-              { internalType: "string", name: "matricNo", type: "string" },
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
             ],
-            internalType: "struct IElection.VoterInfoDTO[]",
-            name: "votersList",
+            internalType: "struct IElection.PollIdentifier[]",
+            name: "pollingUnits",
             type: "tuple[]",
           },
           {
-            internalType: "address[]",
-            name: "pollingUnitAddresses",
-            type: "address[]",
-          },
-          {
-            internalType: "address[]",
-            name: "pollingOfficerAddresses",
-            type: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
+            name: "pollingOfficers",
+            type: "tuple[]",
           },
           {
             internalType: "string[]",
@@ -226,6 +245,8 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
           {
             internalType: "enum IElection.VoterState",
             name: "voterState",
@@ -249,20 +270,17 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
-          { internalType: "uint256", name: "votes", type: "uint256" },
-          { internalType: "uint256", name: "votesAgainst", type: "uint256" },
-          {
-            internalType: "enum IElection.CandidateState",
-            name: "state",
-            type: "uint8",
-          },
+          { internalType: "string", name: "matricNo", type: "string" },
+          { internalType: "string", name: "category", type: "string" },
+          { internalType: "uint256", name: "voteFor", type: "uint256" },
+          { internalType: "uint256", name: "voteAgainst", type: "uint256" },
         ],
-        internalType: "struct IElection.ElectionCandidate[]",
+        internalType: "struct IElection.CandidateInfoDTO[]",
         name: "",
         type: "tuple[]",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -330,6 +348,8 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
           {
             internalType: "enum IElection.VoterState",
             name: "voterState",
@@ -353,6 +373,8 @@ export const abi = [
       {
         components: [
           { internalType: "string", name: "name", type: "string" },
+          { internalType: "string", name: "department", type: "string" },
+          { internalType: "uint256", name: "level", type: "uint256" },
           {
             internalType: "enum IElection.VoterState",
             name: "voterState",
@@ -402,7 +424,7 @@ export const abi = [
         type: "tuple[][]",
       },
     ],
-    stateMutability: "nonpayable",
+    stateMutability: "view",
     type: "function",
   },
   {
@@ -458,14 +480,22 @@ export const abi = [
             type: "string[]",
           },
           {
-            internalType: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
             name: "pollingOfficers",
-            type: "address[]",
+            type: "tuple[]",
           },
           {
-            internalType: "address[]",
+            components: [
+              { internalType: "string", name: "pollRoleName", type: "string" },
+              { internalType: "address", name: "pollAddress", type: "address" },
+            ],
+            internalType: "struct IElection.PollIdentifier[]",
             name: "pollingUnits",
-            type: "address[]",
+            type: "tuple[]",
           },
           {
             components: [

@@ -158,22 +158,22 @@ export function ProgressHeader({
           })}
         </div>
 
-        {/* Progress Indicator */}
-        <div className="mt-4 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-          <div
-            className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"
-            style={{
-              width: `${((currentStep + 1) / steps.length) * 100}%`,
-            }}
-          />
-        </div>
+        {/*/!* Progress Indicator *!/*/}
+        {/*<div className="mt-4 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">*/}
+        {/*  <div*/}
+        {/*    className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-300 ease-in-out"*/}
+        {/*    style={{*/}
+        {/*      width: `${((currentStep + 1) / steps.length) * 100}%`,*/}
+        {/*    }}*/}
+        {/*  />*/}
+        {/*</div>*/}
 
-        {/* Step Indicator Text */}
-        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">
-          {validationState.complete
-            ? "All sections completed - Ready to submit"
-            : `Complete ${steps[currentStep]?.title || "current step"} to continue`}
-        </div>
+        {/*/!* Step Indicator Text *!/*/}
+        {/*<div className="mt-2 text-sm text-gray-600 dark:text-gray-400 text-center">*/}
+        {/*  {validationState.complete*/}
+        {/*    ? "All sections completed - Ready to submit"*/}
+        {/*    : `Complete ${steps[currentStep]?.title || "current step"} to continue`}*/}
+        {/*</div>*/}
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import { Users, CheckCircle, TrendingUp, Calendar, Clock } from "lucide-react";
 import Heading from "@/components/ui/heading";
 import type { Election } from "@/types/election";
 import { formatDate } from "@/lib/utils";
+import ElectionCountdownTimer from "@/components/ui/election-countdown-timer";
 
 interface DashboardHeaderProps {
   election: Election;
@@ -26,16 +27,13 @@ export function DashboardHeader({
   const turnoutPercentage =
     accreditedCount > 0 ? Math.round((votedCount / accreditedCount) * 100) : 0;
 
-  // // Format dates
-  // const formatDate = (dateString: string) => {
-  //   return new Date(dateString).toLocaleDateString("en-US", {
-  //     year: "numeric",
-  //     month: "short",
-  //     day: "numeric",
-  //     hour: "2-digit",
-  //     minute: "2-digit",
-  //   });
-  // };
+  const votersturnoutPercentage =
+    (election?.totalVoters ?? 0) > 0
+      ? (
+          ((election?.totalVotes ?? 0) / (election.totalVoters ?? 1)) *
+          100
+        ).toFixed(1)
+      : "0.0";
 
   // Get status color
   const getStatusColor = (status: string) => {
@@ -73,9 +71,16 @@ export function DashboardHeader({
                 </div>
               </div>
             </div>
-            <Badge className={getStatusColor(election.status)}>
-              {election.status}
-            </Badge>
+            <div className="flex flex-col items-end space-y-4">
+              <Badge className={getStatusColor(election.status)}>
+                {election.status}
+              </Badge>
+              <ElectionCountdownTimer
+                startDate={election.startDate}
+                endDate={election.endDate}
+                status={election.status}
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -122,10 +127,10 @@ export function DashboardHeader({
                 <div>
                   <p className="text-sm text-slate-400">Voted</p>
                   <p className="text-2xl font-bold text-slate-500 dark:text-slate-300">
-                    {votedCount.toLocaleString()}
+                    {(election?.totalVotes ?? 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {turnoutPercentage}% turnout
+                    {votersturnoutPercentage}% turnout
                   </p>
                 </div>
               </div>

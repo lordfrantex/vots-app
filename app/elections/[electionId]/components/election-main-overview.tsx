@@ -5,8 +5,11 @@ import CountdownTimer from "@/components/ui/countdown-timer";
 import StatCard from "@/app/elections/[electionId]/components/election-stat-card";
 import { Separator } from "@/components/ui/separator";
 import { FaUsers } from "react-icons/fa6";
-import { FaVoteYea } from "react-icons/fa";
+import { FaCheck, FaVoteYea } from "react-icons/fa";
 import { HiMiniChartBar } from "react-icons/hi2";
+import { CheckmarkIcon } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { AddVotersToElection } from "@/app/elections/[electionId]/components/add-voters-to-election";
 
 interface ElectionMainOverviewProps {
   election: Election;
@@ -36,6 +39,9 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
   // Determine target date based on election status
   const targetDate = election?.status === "UPCOMING" ? startDate : endDate;
 
+  // Convert election.id to bigint for the component
+  const electionTokenId = BigInt(election.id);
+
   return (
     <div
       className="bg-gray-50 dark:bg-gray-900 p-6 rounded-lg shadow-xl
@@ -55,21 +61,33 @@ const ElectionMainOverview: React.FC<ElectionMainOverviewProps> = ({
       </div>
       <Separator />
 
-      {/* Countdown Timer */}
-      {targetDate && (
-        <CountdownTimer
-          targetDate={targetDate}
-          status={election.status}
-          isStartDate={election.status === "UPCOMING"}
-        />
-      )}
+      <div className="flex items-center justify-between mt-4">
+        {/* Countdown Timer */}
+        {targetDate && (
+          <CountdownTimer
+            targetDate={targetDate}
+            status={election.status}
+            isStartDate={election.status === "UPCOMING"}
+          />
+        )}
+
+        {/*Dialog Pop up*/}
+        {election.status === "UPCOMING" && (
+          <AddVotersToElection electionTokenId={electionTokenId} />
+        )}
+      </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
         <StatCard
           title="Registered Voters"
           value={(election?.totalVoters ?? 0).toLocaleString()}
           icon={<FaUsers />}
+        />
+        <StatCard
+          title="Accredited Voters"
+          value={(election?.accreditedVotersCount ?? 0).toLocaleString()}
+          icon={<FaCheck />}
         />
         <StatCard
           title="Votes Cast"

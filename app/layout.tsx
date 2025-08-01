@@ -16,7 +16,7 @@ const interVariable = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Vots",
+  title: "Vots| Decentralized Voting Platform",
   description: "A decentralized voting platform for tertiary institutions",
 };
 

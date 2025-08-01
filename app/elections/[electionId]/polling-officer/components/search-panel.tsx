@@ -125,18 +125,9 @@ export function InputAccreditationPanel({
       return;
     }
 
-    console.log("=== ATTEMPTING ACCREDITATION ===");
-    console.log("Matric Number:", trimmedMatric);
-    console.log("Election ID:", electionId);
-
     try {
       // Call the accreditation function
       const result = await onAccredit(trimmedMatric);
-
-      console.log("=== ACCREDITATION RESULT ===");
-      console.log("Success:", result.success);
-      console.log("Message:", result.message);
-      console.log("Transaction Hash:", result.txHash);
 
       if (result.success) {
         // Show pending message
@@ -289,7 +280,7 @@ export function InputAccreditationPanel({
   return (
     <div className="space-y-6">
       {/* Main Accreditation Panel */}
-      <Card className="bg-white dark:bg-slate-900/50 dark:border-slate-700/50 max-w-6xl mx-auto">
+      <Card className="bg-white dark:bg-slate-900/50 dark:border-slate-700/50">
         <CardHeader>
           <CardTitle className="text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <UserCheck className="h-5 w-5" />
@@ -318,7 +309,7 @@ export function InputAccreditationPanel({
               <Button
                 onClick={handleAccredit}
                 disabled={isAccrediting || isConfirming || !matricNumber.trim()}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5"
+                className="flex-1 bg-[#233D8A]/70 hover:bg-[#233D8A] text-white font-medium py-2.5 cursor-pointer"
               >
                 {isAccrediting ? (
                   <>

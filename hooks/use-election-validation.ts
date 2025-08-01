@@ -21,7 +21,6 @@ export interface ValidationState {
   basicInfo: boolean;
   categories: boolean;
   candidates: boolean;
-  voters: boolean;
   polling: boolean;
   complete: boolean;
 }
@@ -49,7 +48,6 @@ export function useElectionValidation() {
     basicInfo: false,
     categories: false,
     candidates: false,
-    voters: false,
     polling: false,
     complete: false,
   });
@@ -95,15 +93,6 @@ export function useElectionValidation() {
     },
   });
 
-  // Voters Form
-  const votersForm = useForm<VotersFormData>({
-    resolver: zodResolver(votersSchema),
-    mode: "onChange",
-    defaultValues: {
-      voters: [],
-    },
-  });
-
   // Polling Setup Form
   const pollingForm = useForm<PollingSetupFormData>({
     resolver: zodResolver(pollingSetupSchema),
@@ -122,8 +111,6 @@ export function useElectionValidation() {
     const candidatesValid =
       candidatesForm.formState.isValid &&
       candidatesForm.getValues("candidates").length > 0;
-    const votersValid =
-      votersForm.formState.isValid && votersForm.getValues("voters").length > 0;
 
     const pollingValid =
       pollingForm.formState.isValid &&
@@ -134,29 +121,18 @@ export function useElectionValidation() {
       basicInfo: basicInfoValid,
       categories: categoriesValid && basicInfoValid,
       candidates: candidatesValid && categoriesValid && basicInfoValid,
-      voters:
-        votersValid && candidatesValid && categoriesValid && basicInfoValid,
       polling:
-        pollingValid &&
-        votersValid &&
-        candidatesValid &&
-        categoriesValid &&
-        basicInfoValid,
+        pollingValid && candidatesValid && categoriesValid && basicInfoValid,
       complete:
-        basicInfoValid &&
-        categoriesValid &&
-        candidatesValid &&
-        votersValid &&
-        pollingValid,
+        basicInfoValid && categoriesValid && candidatesValid && pollingValid,
     };
 
     setValidationState(newValidationState);
 
     // Auto-advance current step based on completion
     let newCurrentStep = 0;
-    if (newValidationState.complete) newCurrentStep = 4;
-    else if (newValidationState.polling) newCurrentStep = 4;
-    else if (newValidationState.voters) newCurrentStep = 3;
+    if (newValidationState.complete) newCurrentStep = 3;
+    else if (newValidationState.polling) newCurrentStep = 3;
     else if (newValidationState.candidates) newCurrentStep = 2;
     else if (newValidationState.categories) newCurrentStep = 1;
     else if (newValidationState.basicInfo) newCurrentStep = 1;
@@ -166,7 +142,6 @@ export function useElectionValidation() {
     basicInfoForm.formState.isValid,
     categoriesForm.formState.isValid,
     candidatesForm.formState.isValid,
-    votersForm.formState.isValid,
     pollingForm.formState.isValid,
     validCategories.length,
   ]);
@@ -223,7 +198,6 @@ export function useElectionValidation() {
       basicInfo: basicInfoForm.getValues(),
       categories: categoriesForm.getValues(),
       candidates: candidatesForm.getValues(),
-      voters: votersForm.getValues(),
       polling: pollingForm.getValues(),
     };
 
@@ -237,7 +211,6 @@ export function useElectionValidation() {
     basicInfoForm,
     categoriesForm,
     candidatesForm,
-    votersForm,
     pollingForm,
     validCategories,
   ]);
@@ -252,10 +225,8 @@ export function useElectionValidation() {
           return validationState.basicInfo;
         case "candidates":
           return validationState.categories && validCategories.length > 0;
-        case "voters":
-          return validationState.candidates;
         case "polling":
-          return validationState.voters;
+          return validationState.candidates;
         case "complete":
           return validationState.polling;
         default:
@@ -270,7 +241,6 @@ export function useElectionValidation() {
       basicInfo: basicInfoForm,
       categories: categoriesForm,
       candidates: candidatesForm,
-      voters: votersForm,
       polling: pollingForm,
     },
     validationState,

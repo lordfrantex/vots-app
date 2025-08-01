@@ -13,42 +13,42 @@ const reviews = [
     name: "Dr. Sarah Johnson",
     username: "@sarahjohnson",
     body: "Votes has revolutionized our student elections. The transparency and security it provides has increased student participation by 40%.",
-    img: "https://randomuser.me/api/portraits/men/32.jpg",
+    img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=64&h=64&fit=crop&crop=face",
     rating: 5,
   },
   {
     name: "Michael Chen",
     username: "@michaelchen",
     body: "As someone who's experienced traditional voting systems, the difference is night and day. Students trust the process completely now.",
-    img: "https://randomuser.me/api/portraits/men/52.jpg",
+    img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=64&h=64&fit=crop&crop=face",
     rating: 5,
   },
   {
     name: "Prof. Emily Rodriguez",
     username: "@emilyrodriguez",
     body: "The smart contract implementation is flawless. We've audited the code and can confidently say it's the most secure voting system we've seen.",
-    img: "https://randomuser.me/api/portraits/women/32.jpg",
+    img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=64&h=64&fit=crop&crop=face",
     rating: 5,
   },
   {
     name: "David Kim",
     username: "@davidkim",
     body: "Setting up elections is incredibly intuitive. The real-time results and audit trails give us complete confidence in the process.",
-    img: "https://randomuser.me/api/portraits/men/20.jpg",
+    img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face",
     rating: 5,
   },
   {
     name: "Lisa Thompson",
     username: "@lisathompson",
     body: "Our students love the transparency. Being able to verify their votes on the blockchain has eliminated all trust issues.",
-    img: "https://randomuser.me/api/portraits/women/14.jpg",
+    img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop&crop=face",
     rating: 5,
   },
   {
     name: "James Wilson",
     username: "@jameswilson",
     body: "The fraud prevention is remarkable. We've had zero incidents since implementing Votes for our university elections.",
-    img: "https://randomuser.me/api/portraits/men/60.jpg",
+    img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=64&h=64&fit=crop&crop=face",
     rating: 5,
   },
 ];
@@ -82,7 +82,7 @@ const ReviewCard = memo(
       >
         <div className="flex flex-row items-center gap-2">
           <Image
-            className="rounded-full"
+            className="rounded-full size-14"
             width={32}
             height={32}
             alt=""

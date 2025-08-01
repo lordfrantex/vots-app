@@ -1,9 +1,25 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Github } from "lucide-react";
 import Logo from "@/components/ui/logo";
 
 const Footer = () => {
+  const pathname = usePathname();
+
+  // Check if we're in a polling-unit or polling-officer route
+  const hideFooter =
+    pathname?.includes("/elections/") &&
+    (pathname?.includes("/polling-unit") ||
+      pathname?.includes("/polling-officer"));
+
+  // Don't render footer for these routes
+  if (hideFooter) {
+    return null;
+  }
+
   return (
     <footer className="relative bg-gray-100 dark:bg-gray-900 h-[400px] border-t border-border overflow-hidden">
       <div className="blur-[12rem] h-52 w-52 bg-indigo-400 absolute top-4 left-0 opacity-60" />

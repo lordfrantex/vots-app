@@ -17,13 +17,14 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "randomuser.me",
+        hostname: "images.unsplash.com",
         pathname: "/**",
       },
     ],
-    domains: [
-      "api.microlink.io", // Microlink Image Preview
-    ],
+    domains: ["api.microlink.io"],
+    // Add error handling
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   typescript: {
     // !! WARN !!

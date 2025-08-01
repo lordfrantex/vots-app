@@ -1,9 +1,10 @@
 export interface Voter {
+  voterState?: number;
   id: string;
   name: string;
   matricNumber: string; // For polling officers, this will be masked like "CSC/25/****"
-  email?: string;
-  department?: string;
+  level: string; // e.g. "Undergraduate", "Postgraduate"
+  department?: string; // e.g. "Computer Science"
   isAccredited?: boolean;
   hasVoted?: boolean;
   phoneNumber?: string;
@@ -27,4 +28,19 @@ export interface VoterCredentials {
   matricNumber: string; // Full matric number for voting
   email?: string;
   department?: string;
+}
+
+export interface EnhancedVoter {
+  isRegistered: boolean;
+  id: string;
+  name: string;
+  matricNumber: string;
+  level?: number;
+  department?: string;
+  isAccredited?: boolean;
+  hasVoted?: boolean;
+  photo?: string;
+  accreditedAt?: string;
+  votedAt?: string;
+  voterState?: number;
 }

@@ -13,13 +13,29 @@ import {
   electionAddress,
   SUPPORTED_CHAINS,
 } from "@/contracts/election-address";
-import type { ContractElectionParams } from "@/utils/contract-helpers";
-import type { Address } from "viem";
+import type {
+  ContractElectionParams,
+  ContractVoterInfoDTO,
+} from "@/utils/contract-helpers";
+import type { Address, PublicClient, WalletClient } from "viem";
+import { Voter } from "@/types/voter";
+import { usePollingUnitSession } from "./use-polling-unit-session";
+import { sepolia } from "wagmi/chains";
 
 // Types for write operations - UPDATED for new ABI
 export interface AccreditVoterParams {
   voterMatricNo: string;
   electionTokenId: bigint;
+}
+
+interface ValidatePollingUnitParams {
+  electionTokenId: string;
+}
+
+interface ValidatePollingUnitResult {
+  success: boolean;
+  hash?: string;
+  message: string;
 }
 
 export interface ValidateVoterForVotingParams {
@@ -52,7 +68,7 @@ interface ElectionVoter {
 }
 
 // Helper function to get contract address for current chain
-function getContractAddress(chainId: number): Address | null {
+export function getContractAddress(chainId: number): Address | null {
   const address = electionAddress[chainId as keyof typeof electionAddress];
   return address || null;
 }
@@ -78,90 +94,6 @@ function validateChainSupport(chainId: number): {
 }
 
 // Custom hook for reading voter data efficiently
-function useVoterData(electionTokenId: bigint, chainId: number) {
-  const contractAddress = getContractAddress(chainId);
-
-  // Read all voters
-  const { data: allVoters, refetch: refetchAllVoters } = useReadContract({
-    abi,
-    address: contractAddress,
-    functionName: "getAllVoters",
-    args: [electionTokenId],
-    query: {
-      enabled: !!contractAddress && electionTokenId > 0n,
-      staleTime: 1000 * 30, // 30 seconds
-    },
-  });
-
-  // Read accredited voters
-  const { data: accreditedVoters, refetch: refetchAccreditedVoters } =
-    useReadContract({
-      abi,
-      address: contractAddress,
-      functionName: "getAllAccreditedVoters",
-      args: [electionTokenId],
-      query: {
-        enabled: !!contractAddress && electionTokenId > 0n,
-        staleTime: 1000 * 30, // 30 seconds
-      },
-    });
-
-  // Read voted voters
-  const { data: votedVoters, refetch: refetchVotedVoters } = useReadContract({
-    abi,
-    address: contractAddress,
-    functionName: "getAllVotedVoters",
-    args: [electionTokenId],
-    query: {
-      enabled: !!contractAddress && electionTokenId > 0n,
-      staleTime: 1000 * 30, // 30 seconds
-    },
-  });
-
-  return {
-    allVoters: allVoters as ElectionVoter[] | undefined,
-    accreditedVoters: accreditedVoters as ElectionVoter[] | undefined,
-    votedVoters: votedVoters as ElectionVoter[] | undefined,
-    refetchAll: () => {
-      refetchAllVoters();
-      refetchAccreditedVoters();
-      refetchVotedVoters();
-    },
-  };
-}
-
-// Helper function to check voter status
-function checkVoterStatus(
-  voterMatricNo: string,
-  allVoters?: ElectionVoter[],
-  accreditedVoters?: ElectionVoter[],
-  votedVoters?: ElectionVoter[],
-) {
-  // Check if voter is registered
-  const isRegistered =
-    allVoters?.some(
-      (voter) => voter.name.toLowerCase() === voterMatricNo.toLowerCase(),
-    ) ?? false;
-
-  // Check if voter is accredited
-  const isAccredited =
-    accreditedVoters?.some(
-      (voter) => voter.name.toLowerCase() === voterMatricNo.toLowerCase(),
-    ) ?? false;
-
-  // Check if voter has voted
-  const hasVoted =
-    votedVoters?.some(
-      (voter) => voter.name.toLowerCase() === voterMatricNo.toLowerCase(),
-    ) ?? false;
-
-  return {
-    isRegistered,
-    isAccredited,
-    hasVoted,
-  };
-}
-
 // Hook for creating elections - keeping original implementation
 export function useCreateElection() {
   const { address } = useAccount();
@@ -170,7 +102,7 @@ export function useCreateElection() {
   const [error, setError] = useState<string | null>(null);
 
   const {
-    writeContract,
+    writeContractAsync, // Use writeContractAsync instead of writeContract
     data: hash,
     isPending,
     error: writeError,
@@ -184,12 +116,6 @@ export function useCreateElection() {
     async (
       params: CreateElectionParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== CREATE ELECTION START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Election params:", params);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -213,37 +139,31 @@ export function useCreateElection() {
       setError(null);
 
       try {
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: createElection");
-        console.log("- Args:", [params.electionParams]);
-
-        writeContract({
+        // Wait for the transaction to be submitted
+        const transactionHash = await writeContractAsync({
           abi,
           address: contractAddress,
           functionName: "createElection",
           args: [params.electionParams],
         });
 
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
-
         return {
           success: true,
           message:
-            "Election creation transaction submitted! Please confirm in MetaMask and wait for blockchain confirmation.",
-          hash: hash,
+            "Election creation transaction submitted! Please wait for blockchain confirmation.",
+          hash: transactionHash,
         };
       } catch (err) {
         console.error("=== CREATE ELECTION ERROR ===");
         console.error("Error details:", err);
-        console.error("Write error:", writeError);
 
         let errorMessage = "Failed to create election";
 
         if (err instanceof Error) {
-          if (err.message.includes("User rejected")) {
+          if (
+            err.message.includes("User rejected") ||
+            err.message.includes("user rejected")
+          ) {
             errorMessage = "Transaction was rejected by user";
           } else if (err.message.includes("insufficient funds")) {
             errorMessage = "Insufficient funds for gas fees";
@@ -258,10 +178,9 @@ export function useCreateElection() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== CREATE ELECTION END ===");
       }
     },
-    [address, chainId, writeContract, hash, writeError],
+    [address, chainId, writeContractAsync], // Remove hash and writeError from dependencies
   );
 
   return {
@@ -278,7 +197,163 @@ export function useCreateElection() {
   };
 }
 
+// Add this hook to use-election-write-operations.ts
+export function useAddVotersToElection() {
+  const { address } = useAccount();
+  const chainId = useChainId();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const {
+    writeContractAsync,
+    data: hash,
+    isPending,
+    error: writeError,
+  } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+  });
+
+  const addVotersToElection = useCallback(
+    async (
+      electionTokenId: bigint,
+      votersList: ContractVoterInfoDTO[],
+    ): Promise<{ success: boolean; message: string; hash?: string }> => {
+      if (!address) {
+        return { success: false, message: "Please connect your wallet first" };
+      }
+
+      // Validate input data
+      if (!votersList || votersList.length === 0) {
+        return { success: false, message: "No voters provided" };
+      }
+
+      if (votersList.length > 10000) {
+        return {
+          success: false,
+          message: "Too many voters. Maximum is 10,000 per batch",
+        };
+      }
+
+      // Validate chain support
+      const chainValidation = validateChainSupport(chainId);
+      if (!chainValidation.isSupported) {
+        return { success: false, message: chainValidation.message! };
+      }
+
+      // Get contract address
+      const contractAddress = getContractAddress(chainId);
+      if (!contractAddress) {
+        return {
+          success: false,
+          message: "Contract not deployed on this network",
+        };
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        // console.log("Adding voters to election:", {
+        //   electionTokenId: electionTokenId.toString(),
+        //   votersCount: votersList.length,
+        //   contractAddress,
+        //   chainId,
+        // });
+
+        // Validate voter data structure
+        for (const voter of votersList) {
+          if (!voter.name || !voter.matricNo || !voter.department) {
+            throw new Error("Invalid voter data: missing required fields");
+          }
+        }
+
+        const transactionHash = await writeContractAsync({
+          abi,
+          address: contractAddress,
+          functionName: "addVotersToElection",
+          args: [electionTokenId, votersList],
+        });
+        //
+        // console.log("Transaction submitted:", transactionHash);
+
+        return {
+          success: true,
+          message: `Transaction submitted! Adding ${votersList.length} voters. Please wait for confirmation.`,
+          hash: transactionHash,
+        };
+      } catch (err) {
+        console.error("Add voters error:", err);
+
+        let errorMessage = "Failed to add voters";
+
+        if (err instanceof Error) {
+          const errorMsg = err.message.toLowerCase();
+
+          if (
+            errorMsg.includes("user rejected") ||
+            errorMsg.includes("user denied")
+          ) {
+            errorMessage = "Transaction was rejected by user";
+          } else if (errorMsg.includes("insufficient funds")) {
+            errorMessage = "Insufficient funds for gas fees";
+          } else if (
+            errorMsg.includes("electionnonfound") ||
+            errorMsg.includes("election not found")
+          ) {
+            errorMessage = "Election not found";
+          } else if (
+            errorMsg.includes("unauthorized") ||
+            errorMsg.includes("not authorized")
+          ) {
+            errorMessage =
+              "You are not authorized to add voters to this election";
+          } else if (
+            errorMsg.includes("invalid voter") ||
+            errorMsg.includes("duplicate")
+          ) {
+            errorMessage = "Invalid or duplicate voter data detected";
+          } else if (errorMsg.includes("election state")) {
+            errorMessage =
+              "Election is not in a state that allows adding voters";
+          } else if (errorMsg.includes("gas")) {
+            errorMessage =
+              "Transaction failed due to gas issues. Try increasing gas limit.";
+          } else {
+            // Log the full error for debugging
+            console.error("Full error details:", err);
+            errorMessage = `Transaction failed: ${err.message}`;
+          }
+        }
+
+        setError(errorMessage);
+        return { success: false, message: errorMessage };
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [address, chainId, writeContractAsync],
+  );
+
+  return {
+    addVotersToElection,
+    isLoading: isLoading || isPending || isConfirming,
+    isSuccess,
+    error: error || writeError?.message,
+    hash,
+    isPending,
+    isConfirming,
+    // Helper methods for debugging
+    isTransactionPending: isPending,
+    isTransactionConfirming: isConfirming,
+    isTransactionSuccess: isSuccess,
+  };
+}
 // ENHANCED Hook for accrediting voters with validation
+// Hook for accrediting voters - UPDATED for new ABI
+// FIXED Hook for accrediting voters with proper validation
+// SIMPLIFIED Hook for accrediting voters - just try and give basic feedback
 export function useAccreditVoter() {
   const { address } = useAccount();
   const chainId = useChainId();
@@ -300,12 +375,6 @@ export function useAccreditVoter() {
     async (
       params: AccreditVoterParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== ACCREDIT VOTER START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Params:", params);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -329,116 +398,37 @@ export function useAccreditVoter() {
       setError(null);
 
       try {
-        // Step 1: Read all voters to check if voter is registered
-        console.log("Checking if voter is registered...");
-        const allVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!allVotersResult.ok) {
-          throw new Error("Failed to fetch voter data");
-        }
-
-        const allVoters: ElectionVoter[] = await allVotersResult.json();
-
-        // Check if voter is registered
-        const isRegistered = allVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (!isRegistered) {
-          const errorMsg = `Voter with matric number "${params.voterMatricNo}" is not registered for this election. Please ensure the voter is registered first.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("Voter is registered. Checking accreditation status...");
-
-        // Step 2: Read accredited voters to check if already accredited
-        const accreditedVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllAccreditedVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!accreditedVotersResult.ok) {
-          throw new Error("Failed to fetch accredited voters data");
-        }
-
-        const accreditedVoters: ElectionVoter[] =
-          await accreditedVotersResult.json();
-
-        // Check if voter is already accredited
-        const isAlreadyAccredited = accreditedVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (isAlreadyAccredited) {
-          const errorMsg = `Voter "${params.voterMatricNo}" has already been accredited for this election.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("Voter is eligible for accreditation. Proceeding...");
-
-        // Step 3: Proceed with accreditation
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: accrediteVoter");
-        console.log("- Args:", [params.voterMatricNo, params.electionTokenId]);
-
         writeContract({
           abi,
           address: contractAddress,
           functionName: "accrediteVoter",
-          args: [params.voterMatricNo, params.electionTokenId],
+          args: [params.voterMatricNo, params.electionTokenId], // voterMatricNo, pollingOfficerAddress
         });
-
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
 
         return {
           success: true,
-          message: `Accreditation transaction submitted for voter ${params.voterMatricNo}! Please confirm in MetaMask and wait for blockchain confirmation.`,
+          message: `Voter ${params.voterMatricNo} has been accredited! Please confirm the transaction.`,
           hash: hash,
         };
       } catch (err) {
-        console.error("=== ACCREDIT VOTER ERROR ===");
-        console.error("Error details:", err);
-        console.error("Write error:", writeError);
+        console.error("Accredit error:", err);
 
-        let errorMessage = "Failed to accredit voter";
+        let errorMessage = "Voter not registered";
 
         if (err instanceof Error) {
           if (err.message.includes("User rejected")) {
             errorMessage = "Transaction was rejected by user";
           } else if (err.message.includes("insufficient funds")) {
             errorMessage = "Insufficient funds for gas fees";
-          } else if (err.message.includes("execution reverted")) {
-            errorMessage = "Transaction failed: " + err.message;
-          } else if (err.message.includes("not registered")) {
-            errorMessage = err.message; // Use our custom error message
-          } else if (err.message.includes("already been accredited")) {
-            errorMessage = err.message; // Use our custom error message
+          } else if (err.message.includes("VoterAlreadyAccredited")) {
+            errorMessage = "Voter has already been accredited";
+          } else if (
+            err.message.includes("VoterNotRegistered") ||
+            err.message.includes("noUnknown")
+          ) {
+            errorMessage = "Voter not registered";
           } else {
-            errorMessage = err.message;
+            errorMessage = "Voter not registered";
           }
         }
 
@@ -446,7 +436,6 @@ export function useAccreditVoter() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== ACCREDIT VOTER END ===");
       }
     },
     [address, chainId, writeContract, hash, writeError],
@@ -488,12 +477,6 @@ export function useValidateVoterForVoting() {
     async (
       params: ValidateVoterForVotingParams,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== VALIDATE VOTER FOR VOTING START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Params:", params);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -517,122 +500,6 @@ export function useValidateVoterForVoting() {
       setError(null);
 
       try {
-        console.log("Starting comprehensive voter validation...");
-
-        // Step 1: Check if voter is registered
-        console.log("Step 1: Checking voter registration...");
-        const allVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!allVotersResult.ok) {
-          throw new Error("Failed to fetch registered voters data");
-        }
-
-        const allVoters: ElectionVoter[] = await allVotersResult.json();
-
-        const isRegistered = allVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (!isRegistered) {
-          const errorMsg = `Voter with matric number "${params.voterMatricNo}" is not registered for this election. Please contact the election administrator.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("✓ Voter is registered");
-
-        // Step 2: Check if voter is accredited
-        console.log("Step 2: Checking voter accreditation...");
-        const accreditedVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllAccreditedVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!accreditedVotersResult.ok) {
-          throw new Error("Failed to fetch accredited voters data");
-        }
-
-        const accreditedVoters: ElectionVoter[] =
-          await accreditedVotersResult.json();
-
-        const isAccredited = accreditedVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (!isAccredited) {
-          const errorMsg = `Voter "${params.voterMatricNo}" has not been accredited yet. Please visit the polling officer to get accredited before voting.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("✓ Voter is accredited");
-
-        // Step 3: Check if voter has already voted
-        console.log("Step 3: Checking if voter has already voted...");
-        const votedVotersResult = await fetch("/api/read-contract", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            abi,
-            address: contractAddress,
-            functionName: "getAllVotedVoters",
-            args: [params.electionTokenId],
-            chainId,
-          }),
-        });
-
-        if (!votedVotersResult.ok) {
-          throw new Error("Failed to fetch voted voters data");
-        }
-
-        const votedVoters: ElectionVoter[] = await votedVotersResult.json();
-
-        const hasAlreadyVoted = votedVoters.some(
-          (voter) =>
-            voter.name.toLowerCase() === params.voterMatricNo.toLowerCase(),
-        );
-
-        if (hasAlreadyVoted) {
-          const errorMsg = `Voter "${params.voterMatricNo}" has already cast their vote in this election. Each voter can only vote once.`;
-          setError(errorMsg);
-          return { success: false, message: errorMsg };
-        }
-
-        console.log("✓ Voter has not voted yet");
-        console.log(
-          "All validation checks passed. Proceeding with voter validation...",
-        );
-
-        // Step 4: Proceed with validation for voting
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: validateVoterForVoting");
-        console.log("- Args:", [
-          params.voterMatricNo,
-          params.voterName,
-          params.electionTokenId,
-        ]);
-
         writeContract({
           abi,
           address: contractAddress,
@@ -644,36 +511,38 @@ export function useValidateVoterForVoting() {
           ],
         });
 
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
-
+        // Don't return success immediately - let the transaction be processed
+        // The success will be determined by the transaction receipt
         return {
           success: true,
-          message: `Voter validation successful for ${params.voterMatricNo}! You are eligible to vote. Please confirm the transaction and proceed to cast your ballot.`,
+          message: `Validation transaction submitted for ${params.voterName} (${params.voterMatricNo}). Please confirm the transaction.`,
           hash: hash,
         };
       } catch (err) {
-        console.error("=== VALIDATE VOTER FOR VOTING ERROR ===");
-        console.error("Error details:", err);
-        console.error("Write error:", writeError);
+        console.error("Validate voter error:", err);
 
-        let errorMessage = "Failed to validate voter for voting";
+        let errorMessage = "Voter validation failed";
 
         if (err instanceof Error) {
           if (err.message.includes("User rejected")) {
             errorMessage = "Transaction was rejected by user";
           } else if (err.message.includes("insufficient funds")) {
             errorMessage = "Insufficient funds for gas fees";
-          } else if (err.message.includes("execution reverted")) {
-            errorMessage = "Transaction failed: " + err.message;
-          } else if (err.message.includes("not registered")) {
-            errorMessage = err.message; // Use our custom error message
-          } else if (err.message.includes("not been accredited")) {
-            errorMessage = err.message; // Use our custom error message
-          } else if (err.message.includes("already cast their vote")) {
-            errorMessage = err.message; // Use our custom error message
+          } else if (err.message.includes("VoterNotAccredited")) {
+            errorMessage = "Voter has not been accredited yet";
+          } else if (err.message.includes("VoterAlreadyVoted")) {
+            errorMessage = "Voter has already voted";
+          } else if (
+            err.message.includes("VoterNotRegistered") ||
+            err.message.includes("noUnknown")
+          ) {
+            errorMessage = "Voter not registered";
+          } else if (err.message.includes("InvalidVoterDetails")) {
+            errorMessage = "Invalid voter details provided";
+          } else if (err.message.includes("ElectionNotActive")) {
+            errorMessage = "Election is not currently active";
           } else {
-            errorMessage = err.message;
+            errorMessage = "Voter validation failed";
           }
         }
 
@@ -681,7 +550,6 @@ export function useValidateVoterForVoting() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== VALIDATE VOTER FOR VOTING END ===");
       }
     },
     [address, chainId, writeContract, hash, writeError],
@@ -700,7 +568,6 @@ export function useValidateVoterForVoting() {
     isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }
-
 // Hook for validating polling officers - keeping original implementation
 export function useValidatePollingOfficer() {
   const { address } = useAccount();
@@ -723,12 +590,6 @@ export function useValidatePollingOfficer() {
     async (
       electionTokenId: bigint,
     ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== VALIDATE POLLING OFFICER START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Election Token ID:", electionTokenId);
-
       if (!address) {
         return { success: false, message: "Please connect your wallet first" };
       }
@@ -752,21 +613,12 @@ export function useValidatePollingOfficer() {
       setError(null);
 
       try {
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: validateAddressAsPollingOfficer");
-        console.log("- Args:", [electionTokenId]);
-
         writeContract({
           abi,
           address: contractAddress,
           functionName: "validateAddressAsPollingOfficer",
           args: [electionTokenId],
         });
-
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
 
         return {
           success: true,
@@ -808,7 +660,6 @@ export function useValidatePollingOfficer() {
         return { success: false, message: errorMessage };
       } finally {
         setIsLoading(false);
-        console.log("=== VALIDATE POLLING OFFICER END ===");
       }
     },
     [address, chainId, writeContract, hash, writeError],
@@ -829,205 +680,159 @@ export function useValidatePollingOfficer() {
 }
 // Hook for validating polling units - UPDATED for chain-aware addresses
 export function useValidatePollingUnit() {
-  const { address } = useAccount();
   const chainId = useChainId();
+  const { session, isInitializing } = usePollingUnitSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    writeContract,
-    data: hash,
-    isPending,
-    error: writeError,
-  } = useWriteContract();
+  const validatePollingUnit = async (
+    walletClient: WalletClient,
+    publicClient: PublicClient | null,
+    params: ValidatePollingUnitParams,
+  ): Promise<ValidatePollingUnitResult> => {
+    if (isInitializing) {
+      return {
+        success: false,
+        message: "Session is initializing, please wait",
+      };
+    }
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+    if (!walletClient || !publicClient) {
+      const errorMsg = "Wallet client not initialized";
+      setError(errorMsg);
+      return {
+        success: false,
+        message: errorMsg,
+      };
+    }
 
-  const validatePollingUnit = useCallback(
-    async (
-      electionTokenId: bigint,
-    ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      console.log("=== VALIDATE POLLING UNIT START ===");
-      console.log("Wallet connected:", !!address);
-      console.log("Wallet address:", address);
-      console.log("Chain ID:", chainId);
-      console.log("Election Token ID:", electionTokenId);
+    setIsLoading(true);
+    setError(null);
 
-      if (!address) {
-        return { success: false, message: "Please connect your wallet first" };
-      }
+    try {
+      const electionTokenIdBigInt = BigInt(params.electionTokenId);
 
-      // Validate chain support
-      const chainValidation = validateChainSupport(chainId);
-      if (!chainValidation.isSupported) {
-        return { success: false, message: chainValidation.message! };
-      }
+      const hash = await walletClient.writeContract({
+        address: getContractAddress(chainId),
+        abi,
+        functionName: "validateAddressAsPollingUnit",
+        args: [electionTokenIdBigInt],
+        account: walletClient.account,
+      });
 
-      // Get contract address for current chain
-      const contractAddress = getContractAddress(chainId);
-      if (!contractAddress) {
-        return {
-          success: false,
-          message: "Contract not deployed on this network",
-        };
-      }
+      // Use publicClient to wait for receipt
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash,
+      });
 
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        console.log("Calling writeContract with:");
-        console.log("- Contract address:", contractAddress);
-        console.log("- Chain ID:", chainId);
-        console.log("- Function: validateAddressAsPollingUnit");
-        console.log("- Args:", [electionTokenId]);
-
-        writeContract({
-          abi,
-          address: contractAddress,
-          functionName: "validateAddressAsPollingUnit",
-          args: [electionTokenId],
-        });
-
-        console.log("writeContract called successfully");
-        console.log("Transaction hash:", hash);
-
+      if (receipt.status === "success") {
         return {
           success: true,
-          message:
-            "Polling unit validation transaction submitted! Please confirm in MetaMask and wait for blockchain confirmation.",
-          hash: hash,
+          hash,
+          message: "Polling unit validated successfully",
         };
-      } catch (err) {
-        console.error("=== VALIDATE POLLING UNIT ERROR ===");
-        console.error("Error details:", err);
-        console.error("Write error:", writeError);
-
-        let errorMessage = "Failed to validate polling unit";
-
-        if (err instanceof Error) {
-          if (err.message.includes("User rejected")) {
-            errorMessage = "Transaction was rejected by user";
-          } else if (err.message.includes("insufficient funds")) {
-            errorMessage = "Insufficient funds for gas fees";
-          } else if (err.message.includes("execution reverted")) {
-            errorMessage = "Transaction failed: " + err.message;
-          } else if (err.message.includes("invalid address")) {
-            errorMessage =
-              "Invalid contract address. Please check your configuration.";
-          } else {
-            errorMessage = err.message;
-          }
-        }
-
-        setError(errorMessage);
-        return { success: false, message: errorMessage };
-      } finally {
-        setIsLoading(false);
-        console.log("=== VALIDATE POLLING UNIT END ===");
+      } else {
+        throw new Error("Validation transaction failed");
       }
-    },
-    [address, chainId, writeContract, hash, writeError],
-  );
+    } catch (err: any) {
+      console.error("Polling unit validation error:", err);
+      let errorMessage = "Failed to validate polling unit";
+
+      if (err.message.includes("Not authorized")) {
+        errorMessage = "Not authorized as polling unit for this election";
+      } else if (err.message.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds for gas fees";
+      } else if (err.message.includes("User rejected")) {
+        errorMessage = "Transaction rejected by user";
+      }
+
+      setError(errorMessage);
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     validatePollingUnit,
-    isLoading: isLoading || isPending || isConfirming,
-    isSuccess,
-    error: error || writeError?.message,
-    hash,
-    isPending,
-    isConfirming,
-    chainId,
-    contractAddress: getContractAddress(chainId),
-    isChainSupported: validateChainSupport(chainId).isSupported,
+    isLoading,
+    error,
   };
 }
-
 // Hook for voting - UPDATED for chain-aware addresses
 export function useVoteCandidates() {
   const { address } = useAccount();
   const chainId = useChainId();
+  const { session } = usePollingUnitSession();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
+  const voteCandidates = async (
+    params: VoteCandidatesParams,
+  ): Promise<VoteCandidatesResult> => {
+    if (!session.isValid || !session.walletClient) {
+      const errorMsg =
+        "No valid polling unit session. Please validate your polling unit first.";
+      setError(errorMsg);
+      return {
+        success: false,
+        message: errorMsg,
+      };
+    }
 
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  });
+    setIsLoading(true);
+    setError(null);
 
-  const voteCandidates = useCallback(
-    async (
-      params: VoteCandidatesParams,
-    ): Promise<{ success: boolean; message: string; hash?: string }> => {
-      if (!address) {
-        return { success: false, message: "Please connect your wallet" };
-      }
+    try {
+      // Submit the transaction
+      const hash = await session.walletClient.writeContract({
+        address: getContractAddress(chainId),
+        abi,
+        functionName: "voteCandidates",
+        args: [
+          params.voterMatricNo,
+          params.voterName,
+          params.candidatesList,
+          params.electionTokenId,
+        ],
+        account: session.walletClient.account, // Add this line
+      });
 
-      // Validate chain support
-      const chainValidation = validateChainSupport(chainId);
-      if (!chainValidation.isSupported) {
-        return { success: false, message: chainValidation.message! };
-      }
+      // Wait for transaction confirmation
+      const receipt = await session.walletClient.waitForTransactionReceipt({
+        hash,
+        timeout: 60000, // 1 minute timeout
+      });
 
-      // Get contract address for current chain
-      const contractAddress = getContractAddress(chainId);
-      if (!contractAddress) {
-        return {
-          success: false,
-          message: "Contract not deployed on this network",
-        };
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        console.log("Voting for candidates:", params);
-        console.log("Contract address:", contractAddress);
-        console.log("Chain ID:", chainId);
-
-        writeContract({
-          abi,
-          address: contractAddress,
-          functionName: "voteCandidates",
-          args: [
-            params.voterMatricNo,
-            params.voterName,
-            params.candidatesList,
-            params.electionTokenId,
-          ],
-        });
-
+      if (receipt.status === "success") {
         return {
           success: true,
-          message: "Vote submitted. Please wait for confirmation...",
-          hash: hash,
+          hash,
+          message: "Vote submitted successfully",
         };
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to vote";
-        setError(errorMessage);
-        console.error("Error voting:", err);
-        return { success: false, message: errorMessage };
-      } finally {
-        setIsLoading(false);
+      } else {
+        throw new Error("Transaction failed");
       }
-    },
-    [address, chainId, writeContract, hash],
-  );
+    } catch (err: any) {
+      console.error("Vote submission error:", err);
+      const errorMessage = err.message || "Failed to submit vote";
+      setError(errorMessage);
+
+      return {
+        success: false,
+        message: errorMessage,
+      };
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return {
     voteCandidates,
-    isLoading: isLoading || isPending || isConfirming,
-    isSuccess,
+    isLoading,
     error,
-    hash,
-    chainId,
-    contractAddress: getContractAddress(chainId),
-    isChainSupported: validateChainSupport(chainId).isSupported,
   };
 }

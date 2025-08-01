@@ -4,6 +4,8 @@ export interface Candidate {
   matricNo: string; // Changed from matricNumber to matricNo for consistency
   category: string;
   voteCount?: number;
+  voteFor?: bigint;
+  voteAgainst?: bigint;
   photo?: string;
 }
 

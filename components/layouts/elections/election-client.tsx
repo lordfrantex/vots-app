@@ -46,7 +46,11 @@ const ElectionClient: React.FC = () => {
   const filteredElections = useMemo(() => {
     if (!elections) return [];
 
-    let filtered = elections;
+    // First filter: Only show elections with ID > 5
+    let filtered = elections.filter((election) => {
+      const electionId = parseInt(election.id);
+      return electionId;
+    });
 
     // Apply search filter
     if (searchQuery.trim()) {
@@ -88,19 +92,24 @@ const ElectionClient: React.FC = () => {
     setActiveFilter(filterIndex);
   };
 
-  // Get filter counts for display
+  // Get filter counts for display (only for elections with ID > 7)
   const filterCounts = useMemo(() => {
     if (!elections) return { all: 0, active: 0, upcoming: 0, completed: 0 };
 
+    // Filter elections with ID > 7 first
+    const eligibleElections = elections.filter((election) => {
+      const electionId = parseInt(election.id);
+      return electionId;
+    });
+
     return {
-      all: elections.length,
-      active: elections.filter((e) => e.status === "ACTIVE").length,
-      upcoming: elections.filter((e) => e.status === "UPCOMING").length,
-      completed: elections.filter((e) => e.status === "COMPLETED").length,
+      all: eligibleElections.length,
+      active: eligibleElections.filter((e) => e.status === "ACTIVE").length,
+      upcoming: eligibleElections.filter((e) => e.status === "UPCOMING").length,
+      completed: eligibleElections.filter((e) => e.status === "COMPLETED")
+        .length,
     };
   }, [elections]);
-
-  console.log("Elections:", elections);
 
   return (
     <section className="max-w-7xl mx-auto pb-24">

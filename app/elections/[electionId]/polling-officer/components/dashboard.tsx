@@ -1,19 +1,17 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useElectionDetails } from "@/hooks/use-contract-address";
 import { useAccreditVoter } from "@/hooks/use-election-write-operations";
 import { DashboardHeader } from "./dashboard-header";
 import { InputAccreditationPanel } from "./search-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Shield,
-  RefreshCw,
-  AlertTriangle,
-  ArrowLeft,
-  LogOut,
-} from "lucide-react";
+import { RefreshCw, AlertTriangle, ArrowLeft, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import VoterSearchFilter from "@/components/ui/voter-search-filter";
+import { EnhancedVoter } from "@/types/voter";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface DashboardProps {
   electionId: string;
@@ -26,7 +24,14 @@ export function Dashboard({
   officerWallet,
   onBackToValidation,
 }: DashboardProps) {
-  // Fetch election data
+  const [selectedVoter, setSelectedVoter] = useState<EnhancedVoter | null>(
+    null,
+  );
+  const [filteredVoters, setFilteredVoters] = useState<EnhancedVoter[]>([]);
+  const [activeTab, setActiveTab] = useState<
+    "REGISTERED" | "ACCREDITED" | "VOTED" | "UNACCREDITED"
+  >("REGISTERED");
+
   const {
     election,
     isLoading: isLoadingElection,
@@ -34,7 +39,8 @@ export function Dashboard({
     refetch,
   } = useElectionDetails(electionId);
 
-  // Accreditation hook
+  const queryClient = useQueryClient();
+
   const {
     accreditVoter,
     isLoading: isAccrediting,
@@ -44,79 +50,129 @@ export function Dashboard({
     hash: txHash,
   } = useAccreditVoter();
 
-  // Convert election voters to polling officer view
-  const pollingOfficerVoters = useMemo(() => {
+  const pollRoleName = useMemo(() => {
+    return (
+      election?.pollingOfficers.find(
+        (officer) => officer.address?.pollAddress === officerWallet,
+      )?.address?.pollRoleName || "Unknown Role"
+    );
+  }, [election?.pollingOfficers, officerWallet]);
+
+  // Create ID Sets
+  const accreditedSet = useMemo(() => {
+    return new Set(election?.accreditedVoters?.map((v) => v.id));
+  }, [election?.accreditedVoters]);
+
+  const votedSet = useMemo(() => {
+    return new Set(election?.votedVoters?.map((v) => v.id));
+  }, [election?.votedVoters]);
+
+  // Enhance all voters
+  const enhancedVoters: EnhancedVoter[] = useMemo(() => {
     if (!election?.voters) return [];
 
-    // Convert from standard Voter interface to PollingOfficerVoterView
+    // Create sets for efficient lookup
+    const accreditedIds = new Set(
+      election.accreditedVoters?.map((v) => v.id) || [],
+    );
+
+    // Get voted voters from accreditedVoters array (they have the hasVoted info)
+    const votedIds = new Set(
+      election.accreditedVoters
+        ?.filter((v) => v.hasVoted === true || v.voterState === 3)
+        .map((v) => v.id) || [],
+    );
+
+    // console.log("Accredited IDs:", accreditedIds);
+    // console.log("Voted IDs:", votedIds);
+    // console.log("AccreditedVoters with vote info:", election.accreditedVoters);
+
     return election.voters.map((voter) => {
-      // For now, we'll use the matricNumber as both masked and full
-      // In a real implementation, you'd have off-chain data mapping
-      const fullMatricNumber = voter.matricNumber; // This should come from secure off-chain storage
+      // Check if voter is in accredited array
+      const isInAccreditedArray = accreditedIds.has(voter.id);
+
+      // Check if voter has voted (from accreditedVoters array)
+      const hasVoted = votedIds.has(voter.id);
+
+      // A voter is accredited if they're in the accreditedVoters array
+      const isAccredited = isInAccreditedArray;
 
       return {
         id: voter.id,
         name: voter.name,
-        maskedMatricNumber: voter.matricNumber, // Already masked in the data
-        fullMatricNumber, // From off-chain data
+        matricNumber: voter.matricNumber,
+        department: voter.department,
+        level: voter.level ? Number(voter.level) : undefined,
+        isAccredited,
+        hasVoted,
+        isRegistered: true, // All voters in the array are registered
         photo: "/placeholder-user.jpg",
-        isAccredited: voter.isAccredited || false,
-        hasVoted: voter.hasVoted || false,
-        accreditedAt: voter.isAccredited ? new Date().toISOString() : undefined,
-        votedAt: voter.hasVoted ? new Date().toISOString() : undefined,
+        accreditedAt: isAccredited ? new Date().toISOString() : undefined,
+        votedAt: hasVoted ? new Date().toISOString() : undefined,
       };
     });
-  }, [election?.voters]);
+  }, [election?.voters, election?.accreditedVoters]);
 
-  // Handle voter accreditation
-  const handleAccreditVoter = useCallback(
-    async (
-      matricNumber: string,
-    ): Promise<{ success: boolean; message: string; txHash?: string }> => {
-      console.log("=== HANDLE ACCREDIT VOTER ===");
-      console.log("Matric Number:", matricNumber);
-      console.log("Officer Wallet:", officerWallet);
+  // Updated tabFilteredVoters logic
+  const tabFilteredVoters = useMemo(() => {
+    switch (activeTab) {
+      case "REGISTERED":
+        return enhancedVoters; // All voters (they're all registered)
+      case "ACCREDITED":
+        return enhancedVoters.filter((v) => v.isAccredited); // Accredited but not voted
+      case "VOTED":
+        return enhancedVoters.filter((v) => v.hasVoted); // Has voted
+      case "UNACCREDITED":
+        return enhancedVoters.filter((v) => !v.isAccredited); // Not accredited (and by extension, not voted)
+      default:
+        return enhancedVoters;
+    }
+  }, [activeTab, enhancedVoters]);
 
-      try {
-        const result = await accreditVoter({
-          voterMatricNo: matricNumber,
-          electionTokenId: BigInt(electionId),
+  const totalVoters = enhancedVoters.length;
+  const accreditedCount = election?.accreditedVotersCount || 0;
+  const votedCount = election?.votedVoters?.length || 0;
+
+  const handleVoterSelect = useCallback((voter: EnhancedVoter) => {
+    setSelectedVoter(voter);
+  }, []);
+
+  const handleFilterChange = useCallback((filtered: EnhancedVoter[]) => {
+    setFilteredVoters(filtered);
+  }, []);
+
+  const handleAccreditVoter = async (voterMatricNo: string) => {
+    if (!electionId)
+      return { success: false, message: "Election ID is required" };
+    try {
+      const electionTokenId = BigInt(electionId);
+      const result = await accreditVoter({ voterMatricNo, electionTokenId });
+      if (result.success) {
+        queryClient.invalidateQueries({
+          queryKey: [`electionVoters`, String(electionTokenId)],
         });
-
-        console.log("Accreditation result:", result);
-
-        if (result.success) {
-          // Refetch election data after successful transaction confirmation
-          setTimeout(() => {
-            console.log("Refetching election data...");
-            refetch();
-          }, 5000); // Wait 5 seconds for blockchain confirmation
-        }
-
-        return {
-          success: result.success,
-          message: result.message,
-        };
-      } catch (error) {
-        console.error("Error accrediting voter:", error);
-        return {
-          success: false,
-          message:
-            error instanceof Error ? error.message : "Failed to accredit voter",
-        };
       }
-    },
-    [accreditVoter, electionId, refetch, officerWallet],
-  );
+      return result;
+    } catch (error) {
+      console.error("Accreditation error:", error);
+      return { success: false, message: "An unexpected error occurred" };
+    }
+  };
 
-  // Calculate stats for header
-  const totalVoters = pollingOfficerVoters.length;
-  const accreditedCount = pollingOfficerVoters.filter(
-    (v) => v.isAccredited,
-  ).length;
-  const votedCount = pollingOfficerVoters.filter((v) => v.hasVoted).length;
+  // Derive voters by tab
+  const displayedVoters = useMemo(() => {
+    switch (activeTab) {
+      case "ACCREDITED":
+        return enhancedVoters.filter((v) => v.isAccredited);
+      case "VOTED":
+        return enhancedVoters.filter((v) => v.hasVoted);
+      case "UNACCREDITED":
+        return enhancedVoters.filter((v) => !v.isAccredited && v.isRegistered);
+      default:
+        return enhancedVoters;
+    }
+  }, [activeTab, enhancedVoters]);
 
-  // Loading state
   if (isLoadingElection) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -131,7 +187,6 @@ export function Dashboard({
     );
   }
 
-  // Error state
   if (electionError || !election) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -166,11 +221,14 @@ export function Dashboard({
 
   return (
     <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Top Navigation Bar */}
+      <div className="container mx-auto px-4 py-6 pb-12 space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col items-start space-y-2">
             <h1 className="text-2xl font-bold">Polling Officer Dashboard</h1>
+            <div className="text-sm text-slate-500 font-medium">
+              Officer: {pollRoleName}
+            </div>
             <div className="text-sm text-slate-400">
               Connected: {officerWallet.slice(0, 6)}...{officerWallet.slice(-4)}
             </div>
@@ -187,7 +245,6 @@ export function Dashboard({
           )}
         </div>
 
-        {/* Header with correct props */}
         <DashboardHeader
           election={election}
           totalVoters={totalVoters}
@@ -195,48 +252,66 @@ export function Dashboard({
           votedCount={votedCount}
         />
 
-        {/* Officer Information Alert */}
-        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-700 max-w-6xl mx-auto">
-          <Shield className="h-4 w-4" />
-          <AlertDescription className="text-blue-900 dark:text-blue-300">
-            <strong>Polling Officer:</strong> {officerWallet}
-            <br />
-            <span className="text-sm text-blue-900 dark:text-blue-300">
-              All accreditation transactions will be signed with this wallet
-              address.
-            </span>
-          </AlertDescription>
-        </Alert>
-
-        {/* Accreditation Error Alert */}
         {accreditationError && (
-          <Alert className="bg-red-900/20 border-red-700">
+          <Alert className="bg-red-900/20 border-red-700 max-w-6xl mx-auto">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription className="text-red-300">
-              <strong>Accreditation Error:</strong> {accreditationError}
+              <strong>Accreditation Error:</strong> Voter is already accredited
+              or has voted or is not registered.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-          {/* Accreditation Panel */}
-          <div className="space-y-6">
-            <InputAccreditationPanel
-              onAccredit={handleAccreditVoter}
-              isAccrediting={isAccrediting}
-              isConfirming={isConfirming}
-              isSuccess={accreditationSuccess}
-              txHash={txHash}
-              electionId={electionId}
-              voters={election.voters.map((voter) => ({
-                matricNumber: voter.matricNumber,
-                isAccredited: voter.isAccredited || false,
-                name: voter.name,
-              }))}
-            />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+          <InputAccreditationPanel
+            onAccredit={handleAccreditVoter}
+            isAccrediting={isAccrediting}
+            isConfirming={isConfirming}
+            isSuccess={accreditationSuccess}
+            txHash={txHash}
+            electionId={electionId}
+            voters={enhancedVoters.map((v) => ({
+              name: v.name,
+              matricNumber: v.matricNumber,
+              isAccredited: v.isAccredited,
+            }))}
+          />
+
+          <VoterSearchFilter
+            voters={displayedVoters}
+            onFilter={handleFilterChange}
+            onVoterSelect={handleVoterSelect}
+            showResults={true}
+            placeholder="Search voters by name, level, or department..."
+            className="h-fit"
+            electionStatus={election.status}
+          />
         </div>
+
+        {selectedVoter && (
+          <div className="mt-6 max-w-2xl border rounded-md bg-slate-50 dark:bg-slate-800 p-4 shadow-sm">
+            <h4 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
+              Selected Voter
+            </h4>
+            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+              <strong>Name:</strong> {selectedVoter.name}
+              <br />
+              <strong>Matric:</strong> {selectedVoter.matricNumber}
+              <br />
+              {selectedVoter.level && (
+                <>
+                  <strong>Level:</strong> {selectedVoter.level}
+                  <br />
+                </>
+              )}
+              {selectedVoter.department && (
+                <>
+                  <strong>Department:</strong> {selectedVoter.department}
+                </>
+              )}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

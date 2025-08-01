@@ -8,6 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   CheckCircle,
   AlertTriangle,
   Loader2,
@@ -16,7 +22,7 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
-import { useValidateVoterForVoting } from "@/hooks/use-election-write-operations";
+import { useSessionValidateVoter } from "@/hooks/use-session-validate-voter";
 
 interface VoterAuthenticationModalProps {
   electionId: string;
@@ -40,7 +46,7 @@ const VoterAuthenticationModal = ({
   onBack,
 }: VoterAuthenticationModalProps) => {
   const [matricNumber, setMatricNumber] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [surname, setSurname] = useState("");
   const [authenticationResult, setAuthenticationResult] = useState<{
     success: boolean;
     voter?: {
@@ -60,62 +66,78 @@ const VoterAuthenticationModal = ({
     return BigInt(electionId);
   }, [electionId]);
 
-  // Use the voter validation hook
+  // Use the session-based hook
   const {
     validateVoterForVoting,
-    isLoading: isValidating,
+    isLoading: isSessionValidating,
     isSuccess: isValidationSuccess,
     error: contractError,
     hash: validationHash,
-    isPending: isContractPending,
-    isConfirming,
-  } = useValidateVoterForVoting();
+    isConfirming: isSessionConfirming,
+  } = useSessionValidateVoter();
+
+  const isProcessing = isSessionValidating || isSessionConfirming;
 
   // Handle validation success
   useEffect(() => {
-    if (isValidationSuccess) {
-      console.log("Voter validation successful");
+    if (isValidationSuccess && validationHash) {
       setAuthenticationResult({
         success: true,
         voter: {
-          name: fullName,
+          name: surname,
           matricNumber: matricNumber,
           isAccredited: true,
           hasVoted: false,
         },
       });
     }
-  }, [isValidationSuccess, fullName, matricNumber]);
+  }, [isValidationSuccess, validationHash, surname, matricNumber]);
 
   // Handle contract errors
   useEffect(() => {
     if (contractError) {
       console.error("Voter validation error:", contractError);
+      let errorMessage = contractError;
+
+      // Map contract errors to user-friendly messages
+      if (contractError.includes("VoterNotAccredited")) {
+        errorMessage =
+          "Voter has not been accredited yet. Please contact election officials.";
+      } else if (contractError.includes("VoterAlreadyVoted")) {
+        errorMessage = "Voter has already voted in this election.";
+      } else if (contractError.includes("VoterNotRegistered")) {
+        errorMessage = "Voter is not registered for this election.";
+      } else if (contractError.includes("InvalidVoterDetails")) {
+        errorMessage =
+          "Invalid voter details. Please check your name and matriculation number.";
+      } else if (contractError.includes("ElectionNotActive")) {
+        errorMessage = "Election is not currently active.";
+      }
+
       setAuthenticationResult({
         success: false,
-        error: contractError,
+        error: errorMessage,
       });
     }
   }, [contractError]);
 
   const handleAuthenticate = async () => {
-    if (!matricNumber.trim() || !fullName.trim()) {
+    if (!matricNumber.trim() || !surname.trim()) {
+      setAuthenticationResult({
+        success: false,
+        error: "Please enter both your name and matriculation number.",
+      });
       return;
     }
 
+    // Clear previous results
     setAuthenticationResult(null);
 
     try {
-      console.log("Validating voter for voting:", {
-        matricNumber,
-        fullName,
-        electionTokenId,
-      });
-
-      // Call the blockchain validation function
+      // Call the blockchain validation function with CORRECT parameter names
       const result = await validateVoterForVoting({
+        voterName: surname.trim(),
         voterMatricNo: matricNumber.trim(),
-        voterName: fullName.trim(),
         electionTokenId: electionTokenId,
       });
 
@@ -125,12 +147,13 @@ const VoterAuthenticationModal = ({
           error: result.message,
         });
       }
-      // Success will be handled by the useEffect above
+      // Success will be handled by the useEffect above when transaction confirms
     } catch (err) {
       console.error("Authentication error:", err);
       setAuthenticationResult({
         success: false,
-        error: "Authentication failed. Please try again.",
+        error:
+          "Authentication failed. Please check your details and try again.",
       });
     }
   };
@@ -145,7 +168,12 @@ const VoterAuthenticationModal = ({
     }
   };
 
-  const isProcessing = isValidating || isContractPending || isConfirming;
+  // Reset authentication result when form is cleared
+  useEffect(() => {
+    if (!matricNumber.trim() && !surname.trim()) {
+      setAuthenticationResult(null);
+    }
+  }, [matricNumber, surname]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -206,7 +234,7 @@ const VoterAuthenticationModal = ({
                 <Input
                   id="matricNumber"
                   type="text"
-                  placeholder="Enter your matriculation number"
+                  placeholder="Enter your matriculation number (e.g. UNI/12/2021)"
                   value={matricNumber}
                   onChange={(e) => setMatricNumber(e.target.value)}
                   className="pl-10 bg-slate-300/20 dark:bg-slate-800/50 dark:border-slate-600 placeholder-slate-400"
@@ -217,19 +245,19 @@ const VoterAuthenticationModal = ({
 
             <div className="space-y-2">
               <Label
-                htmlFor="fullName"
+                htmlFor="surname"
                 className="text-slate-700 dark:text-slate-300"
               >
-                Full Name
+                Surname
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  id="fullName"
+                  id="surname"
                   type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your surname in CAPS (e.g ADEFISAN)"
+                  value={surname}
+                  onChange={(e) => setSurname(e.target.value)}
                   className="pl-10 bg-slate-300/20 dark:bg-slate-800/50 dark:border-slate-600 placeholder-slate-400"
                   disabled={isProcessing}
                 />
@@ -240,13 +268,13 @@ const VoterAuthenticationModal = ({
             {validationHash && (
               <div className="p-4 bg-blue-500/20 dark:bg-blue-900/20 border border-blue-700/50 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
-                  {isConfirming ? (
+                  {isProcessing ? (
                     <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
                   ) : (
                     <CheckCircle className="h-4 w-4 text-blue-400" />
                   )}
                   <span className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                    {isConfirming
+                    {isProcessing
                       ? "Confirming Authentication..."
                       : "Authentication Transaction Submitted"}
                   </span>
@@ -257,11 +285,11 @@ const VoterAuthenticationModal = ({
               </div>
             )}
 
-            {authenticationResult?.error && (
+            {contractError && (
               <Alert className="bg-red-900/20 border-red-700/50">
                 <AlertTriangle className="h-4 w-4 text-red-400" />
                 <AlertDescription className="text-red-300">
-                  {authenticationResult.error}
+                  Voter authentication failed. Try again!
                 </AlertDescription>
               </Alert>
             )}
@@ -270,7 +298,7 @@ const VoterAuthenticationModal = ({
               <Button
                 onClick={onBack}
                 variant="outline"
-                className="flex-1 bg-transparent"
+                className="flex-1 bg-transparent hidden"
                 disabled={isProcessing}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -279,19 +307,14 @@ const VoterAuthenticationModal = ({
               <Button
                 onClick={handleAuthenticate}
                 disabled={
-                  !matricNumber.trim() || !fullName.trim() || isProcessing
+                  !matricNumber.trim() || !surname.trim() || isProcessing
                 }
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 {isProcessing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isContractPending && "Preparing..."}
-                    {isConfirming && "Confirming..."}
-                    {isValidating &&
-                      !isContractPending &&
-                      !isConfirming &&
-                      "Authenticating..."}
+                    {validationHash ? "Confirming..." : "Preparing..."}
                   </>
                 ) : (
                   <>
@@ -304,34 +327,41 @@ const VoterAuthenticationModal = ({
           </CardContent>
         </Card>
 
-        {/* Authentication Success */}
-        {authenticationResult?.success && authenticationResult.voter && (
-          <Card className="bg-green-400/10 dark:bg-green-900/20 backdrop-blur-xl border-green-500/50 dark:border-green-700/50">
-            <CardHeader>
+        {/* Authentication Success Dialog */}
+        <Dialog
+          open={authenticationResult?.success && !!authenticationResult.voter}
+          onOpenChange={() => {
+            // Prevent closing the dialog by clicking outside or escape
+            // User must click "Proceed to Vote" button
+          }}
+        >
+          <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border-green-500/50">
+            <DialogHeader>
               <div className="text-center">
                 <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <CheckCircle className="h-8 w-8 text-green-700 dark:text-green-400" />
                 </div>
-                <CardTitle className="text-green-700 dark:text-green-400">
+                <DialogTitle className="text-green-700 dark:text-green-400 text-xl">
                   Authentication Successful
-                </CardTitle>
+                </DialogTitle>
                 <p className="text-green-600 dark:text-green-400 text-sm mt-2">
                   You have been verified and can now proceed to vote
                 </p>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            </DialogHeader>
+
+            <div className="space-y-4 mt-4">
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-slate-400">Name:</span>
                   <span className="font-medium">
-                    {authenticationResult.voter.name}
+                    {authenticationResult?.voter?.name}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Matriculation:</span>
                   <span className="font-mono">
-                    {authenticationResult.voter.matricNumber}
+                    {authenticationResult?.voter?.matricNumber}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -349,9 +379,9 @@ const VoterAuthenticationModal = ({
                 <ArrowRight className="mr-2 h-4 w-4" />
                 Proceed to Vote
               </Button>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="text-center">
           <p className="text-xs text-slate-500">

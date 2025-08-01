@@ -25,6 +25,9 @@ import VoteConfirmationModal from "./vote-confirmation-modal";
 import type { Candidate } from "@/types/candidate";
 import Image from "next/image";
 import toast from "react-hot-toast";
+import { useSessionVoteCandidates } from "@/hooks/use-session-vote-candidates";
+import ElectionCountdownTimer from "@/components/ui/election-countdown-timer";
+import { FaUser } from "react-icons/fa6";
 
 interface VotingPageProps {
   electionId: string;
@@ -54,32 +57,38 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState("");
   const [votingEnded, setVotingEnded] = useState(false);
-  const [voteSubmitted, setVoteSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   // Use the consolidated hook for election details
-  const { election, isLoading, error } = useElectionDetails(electionId);
+  const { election, error } = useElectionDetails(electionId);
 
-  // Voting hook
+  // Voting hook - get the transaction states from the hook
   const {
     voteCandidates,
-    isLoading: isVoting,
+    isLoading: isCreating,
+    isSuccess,
     error: votingError,
-  } = useVoteCandidates();
+    hash,
+    isConfirming,
+  } = useSessionVoteCandidates();
 
   // Group candidates by category
   const candidatesByCategory = useMemo(() => {
     if (!election?.candidates) return {};
 
-    const grouped: { [category: string]: Candidate[] } = {};
-
-    election.candidates.forEach((candidate: Candidate) => {
-      if (!grouped[candidate.category]) {
-        grouped[candidate.category] = [];
-      }
-      grouped[candidate.category].push(candidate);
-    });
-
-    return grouped;
+    return election.candidates.reduce(
+      (acc, candidate) => {
+        const category = candidate.category;
+        if (!acc[category]) {
+          acc[category] = [];
+        }
+        acc[category].push(candidate);
+        return acc;
+      },
+      {} as Record<string, Candidate[]>,
+    );
   }, [election?.candidates]);
 
   // Calculate progress
@@ -89,6 +98,39 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     categories.length > 0
       ? (selectedCategories.length / categories.length) * 100
       : 0;
+
+  // Handle early navigation when transaction starts confirming
+  useEffect(() => {
+    if (isConfirming && !showSuccessMessage) {
+      setShowSuccessMessage(true);
+      toast.success("Vote submitted successfully!");
+
+      // Navigate back immediately when confirmation starts
+      setTimeout(() => {
+        onBack();
+      }, 2000); // Short delay to show success message
+    }
+  }, [isConfirming, showSuccessMessage, onBack]);
+
+  // Handle final success state (for logging purposes, user already navigated)
+  useEffect(() => {
+    if (isSuccess && !showSuccessMessage) {
+      // This will only run if isSuccess happens before isConfirming
+      setIsConfirmed(true);
+      toast.success("Vote submitted successfully!");
+      setTimeout(() => {
+        onBack();
+      }, 2000);
+    }
+  }, [isSuccess, showSuccessMessage, onBack]);
+
+  // Handle contract errors
+  useEffect(() => {
+    if (votingError) {
+      toast.error("Failed to submit vote");
+      setIsSubmitting(false);
+    }
+  }, [votingError]);
 
   // Update countdown timer
   useEffect(() => {
@@ -154,12 +196,16 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
     }));
   };
 
+  // Modified submit handler with early navigation logic
   const handleSubmitVote = async () => {
     if (selectedCategories.length !== categories.length || votingEnded) {
       return;
     }
 
     try {
+      setIsSubmitting(true);
+      setShowConfirmation(false);
+
       // Convert selections to contract format
       const candidatesList = Object.entries(selections).map(
         ([category, selection]) => ({
@@ -171,6 +217,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         }),
       );
 
+      // Submit to blockchain using the hook
       const result = await voteCandidates({
         voterMatricNo: voter.matricNumber,
         voterName: voter.name,
@@ -178,40 +225,23 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         electionTokenId: BigInt(electionId),
       });
 
-      if (result.success) {
-        setVoteSubmitted(true);
-        setShowConfirmation(false);
-
-        // Show success toast
-        toast.success("Your vote has been submitted successfully!", {
-          duration: 4000,
-          position: "top-center",
-          style: {
-            background: "#10B981",
-            color: "#FFFFFF",
-          },
-        });
-
-        // Wait for 3 seconds before going back to allow user to see the success state
-        setTimeout(() => {
-          onBack();
-        }, 7000);
+      if (!result.success) {
+        toast.error("Failed to submit vote");
+        setIsSubmitting(false);
       }
+      // Note: We don't set isSubmitting to false here because the useEffect
+      // for isConfirming will handle navigation
     } catch (error) {
-      console.error("Voting error:", error);
-      toast.error("Failed to submit vote. Please try again.", {
-        duration: 4000,
-        position: "top-center",
-        style: {
-          background: "#EF4444",
-          color: "#FFFFFF",
-        },
-      });
+      console.error("Error in vote submission:", error);
+      toast.error("Unexpected error occurred");
+      setIsSubmitting(false);
     }
   };
 
+  const isLoading = isSubmitting || isCreating;
+
   // Loading state
-  if (isLoading) {
+  if (isLoading && !election) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="text-center space-y-4">
@@ -245,10 +275,10 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
   // Check if voting has ended based on election status
   const isVotingEnded = election.status === "COMPLETED" || votingEnded;
 
-  // Vote submitted success state
-  if (voteSubmitted) {
+  // Vote submitted success state (shown while transaction is confirming)
+  if (showSuccessMessage || isConfirmed) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-6">
           <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
             <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
@@ -258,10 +288,17 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
               Vote Submitted Successfully!
             </h2>
             <p className="text-slate-600 dark:text-slate-300">
-              Thank you for participating in the election.
+              Your vote is being processed on the blockchain.
             </p>
+            {hash && (
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                Transaction: {hash.slice(0, 10)}...{hash.slice(-8)}
+              </p>
+            )}
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Redirecting you back to the authentication page...
+              {isConfirming
+                ? "Processing in background. Redirecting you back..."
+                : "Redirecting you back to the authentication page..."}
             </p>
           </div>
           <div className="flex items-center justify-center space-x-2">
@@ -320,16 +357,31 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                     Voter Information
                   </span>
                 </div>
-                <div className="pl-6 space-y-1">
-                  <p className="text-sm text-slate-900 dark:text-white font-medium">
-                    {voter.name}
-                  </p>
-                  <Badge
-                    variant="outline"
-                    className="border-green-200 dark:border-green-500/50 text-green-700 dark:text-green-400 font-mono text-xs"
-                  >
-                    ID: {voter.matricNumber}
-                  </Badge>
+
+                <div className="flex items-center">
+                  {/* Avatar */}
+                  <div className="flex gap-3 items-center justify-center">
+                    <div
+                      className={`
+          w-16 h-16 rounded-full bg-gradient-to-b dark:from-blue-500/30 dark:via-55% dark:to-gray-900 border border-gray-500/30
+          flex items-center justify-center text-white font-bold text-lg
+          shadow-2xl
+        `}
+                    >
+                      <FaUser size={24} className="text-indigo-400/40" />
+                    </div>
+                  </div>
+                  <div className="pl-6 space-y-1">
+                    <p className="text-base text-slate-900 dark:text-white font-bold">
+                      {voter.name}
+                    </p>
+                    <Badge
+                      variant="outline"
+                      className="border-green-200 dark:border-green-500/50 text-green-700 dark:text-green-400 font-mono text-xs"
+                    >
+                      ID: {voter.matricNumber}
+                    </Badge>
+                  </div>
                 </div>
               </div>
 
@@ -338,21 +390,14 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Time Remaining
+                    Election closes in
                   </span>
                 </div>
-                <div className="pl-6">
-                  <Badge
-                    variant="outline"
-                    className={`font-mono ${
-                      isVotingEnded
-                        ? "border-red-200 dark:border-red-500/50 text-red-700 dark:text-red-400"
-                        : "border-blue-200 dark:border-blue-500/50 text-blue-700 dark:text-blue-400"
-                    }`}
-                  >
-                    {timeRemaining}
-                  </Badge>
-                </div>
+                <ElectionCountdownTimer
+                  startDate={election.startDate}
+                  endDate={election.endDate}
+                  status={election.status}
+                />
               </div>
 
               {/* Progress */}
@@ -427,126 +472,130 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
 
                   <CardContent>
                     <div className="grid grid-cols-1 gap-4">
-                      {categoryCandidate.map((candidate) => (
-                        <div
-                          key={candidate.id}
-                          className={`p-4 rounded-lg border-2 transition-all duration-200 ${
-                            selectedCandidate?.candidateMatricNo ===
-                            candidate.matricNo
-                              ? "border-blue-300 dark:border-blue-500 bg-blue-50 dark:bg-blue-500/10"
-                              : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 hover:border-slate-300 dark:hover:border-slate-500"
-                          }`}
-                        >
-                          <div className="flex items-center space-x-4">
-                            <div className="relative">
-                              <Image
-                                src={
-                                  candidate.photo ||
-                                  "/placeholder.svg?height=48&width=48"
-                                }
-                                alt={candidate.name}
-                                fill
-                                className="w-12 h-12 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
-                              />
-                            </div>
-
-                            <div className="flex-1">
-                              <h4 className="font-medium text-slate-900 dark:text-white">
-                                {candidate.name}
-                              </h4>
-                              <p className="text-sm text-slate-600 dark:text-slate-400">
-                                Candidate ID: {candidate.matricNo}
-                              </p>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              {isSingleCandidate ? (
-                                // For/Against buttons for single candidate
-                                <>
-                                  <Button
-                                    onClick={() =>
-                                      handleSingleCandidateVote(
-                                        category,
-                                        candidate,
-                                        "for",
-                                      )
-                                    }
-                                    variant={
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "for"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    size="sm"
-                                    disabled={isVotingEnded}
-                                    className={`${
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "for"
-                                        ? "bg-green-600 hover:bg-green-700 text-white"
-                                        : "border-green-300 dark:border-green-500/50 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10"
-                                    }`}
-                                  >
-                                    <ThumbsUp className="h-4 w-4 mr-1" />
-                                    FOR
-                                  </Button>
-                                  <Button
-                                    onClick={() =>
-                                      handleSingleCandidateVote(
-                                        category,
-                                        candidate,
-                                        "against",
-                                      )
-                                    }
-                                    variant={
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "against"
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    size="sm"
-                                    disabled={isVotingEnded}
-                                    className={`${
-                                      selectedCandidate?.candidateMatricNo ===
-                                        candidate.matricNo &&
-                                      selectedCandidate?.voteType === "against"
-                                        ? "bg-red-600 hover:bg-red-700 text-white"
-                                        : "border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
-                                    }`}
-                                  >
-                                    <ThumbsDown className="h-4 w-4 mr-1" />
-                                    AGAINST
-                                  </Button>
-                                </>
-                              ) : (
-                                // Radio button for multiple candidates
-                                <button
-                                  onClick={() =>
-                                    !isVotingEnded &&
-                                    handleCandidateSelect(category, candidate)
+                      <div className="grid grid-cols-1 gap-4">
+                        {categoryCandidate.map((candidate) => (
+                          <div
+                            key={candidate.id}
+                            className={`p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
+                              selectedCandidate?.candidateMatricNo ===
+                              candidate.matricNo
+                                ? "border-blue-300 dark:border-blue-500 bg-blue-50 dark:bg-blue-500/10"
+                                : "border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800/30 hover:border-slate-300 dark:hover:border-slate-500"
+                            } ${isVotingEnded ? "opacity-50 cursor-not-allowed" : ""}`}
+                            onClick={() => {
+                              if (!isVotingEnded && !isSingleCandidate) {
+                                handleCandidateSelect(category, candidate);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className="relative">
+                                <Image
+                                  src={
+                                    candidate.photo ||
+                                    "/placeholder.svg?height=48&width=48"
                                   }
-                                  disabled={isVotingEnded}
-                                  className={`w-5 h-5 rounded-full border-2 cursor-pointer transition-all ${
-                                    selectedCandidate?.candidateMatricNo ===
-                                    candidate.matricNo
-                                      ? "border-blue-500 bg-blue-500"
-                                      : "border-slate-400 dark:border-slate-500 hover:border-slate-500 dark:hover:border-slate-400"
-                                  } ${isVotingEnded ? "opacity-50 cursor-not-allowed" : ""}`}
-                                >
-                                  {selectedCandidate?.candidateMatricNo ===
-                                    candidate.matricNo && (
-                                    <div className="w-full h-full rounded-full bg-blue-500 flex items-center justify-center">
-                                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                                    </div>
-                                  )}
-                                </button>
-                              )}
+                                  alt={candidate.name}
+                                  fill
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
+                                />
+                              </div>
+
+                              <div className="flex-1">
+                                <h4 className="font-medium text-slate-900 dark:text-white">
+                                  {candidate.name}
+                                </h4>
+                                <p className="text-sm text-slate-600 dark:text-slate-400">
+                                  Candidate ID: {candidate.matricNo}
+                                </p>
+                              </div>
+
+                              <div className="flex items-center space-x-2">
+                                {isSingleCandidate ? (
+                                  // For/Against buttons for single candidate
+                                  <>
+                                    <Button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSingleCandidateVote(
+                                          category,
+                                          candidate,
+                                          "for",
+                                        );
+                                      }}
+                                      variant={
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType === "for"
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      disabled={isVotingEnded}
+                                      className={`${
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType === "for"
+                                          ? "bg-green-600 hover:bg-green-700 text-white"
+                                          : "border-green-300 dark:border-green-500/50 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-500/10"
+                                      }`}
+                                    >
+                                      <ThumbsUp className="h-4 w-4 mr-1" />
+                                      FOR
+                                    </Button>
+                                    <Button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSingleCandidateVote(
+                                          category,
+                                          candidate,
+                                          "against",
+                                        );
+                                      }}
+                                      variant={
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType ===
+                                          "against"
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      size="sm"
+                                      disabled={isVotingEnded}
+                                      className={`${
+                                        selectedCandidate?.candidateMatricNo ===
+                                          candidate.matricNo &&
+                                        selectedCandidate?.voteType ===
+                                          "against"
+                                          ? "bg-red-600 hover:bg-red-700 text-white"
+                                          : "border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
+                                      }`}
+                                    >
+                                      <ThumbsDown className="h-4 w-4 mr-1" />
+                                      AGAINST
+                                    </Button>
+                                  </>
+                                ) : (
+                                  // Checkmark for multiple candidates
+                                  <div
+                                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                      selectedCandidate?.candidateMatricNo ===
+                                      candidate.matricNo
+                                        ? "border-blue-500 bg-blue-500"
+                                        : "border-slate-400 dark:border-slate-500"
+                                    }`}
+                                  >
+                                    {selectedCandidate?.candidateMatricNo ===
+                                      candidate.matricNo && (
+                                      <CheckCircle className="w-3 h-3 text-white" />
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -613,7 +662,8 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                 <Alert className="mt-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50">
                   <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
                   <AlertDescription className="text-red-700 dark:text-red-300">
-                    <strong>Error:</strong> {votingError}
+                    <strong>Error:</strong> Vote could not be submitted. Please
+                    try again.
                   </AlertDescription>
                 </Alert>
               )}
@@ -623,12 +673,12 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                   onClick={() => setShowConfirmation(true)}
                   disabled={
                     selectedCategories.length !== categories.length ||
-                    isVoting ||
+                    isSubmitting ||
                     isVotingEnded
                   }
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 h-12 disabled:opacity-50"
+                  className="flex-1 bg-[#324278] hover:bg-blue-900 cursor-pointer text-white font-medium py-3 h-12 disabled:opacity-50"
                 >
-                  {isVoting ? (
+                  {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Submitting Vote...
@@ -642,9 +692,9 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
                 </Button>
               </div>
 
-              <Alert className="mt-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/50">
-                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <AlertDescription className="text-red-700 dark:text-red-300">
+              <Alert className="mt-4 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-amber-700 dark:text-amber-300">
                   <strong>Warning:</strong> Once submitted, you cannot change
                   your vote. Please review your selections carefully.
                 </AlertDescription>
@@ -661,7 +711,7 @@ const VotingPage = ({ electionId, voter, onBack }: VotingPageProps) => {
         onConfirm={handleSubmitVote}
         selections={selections}
         voter={voter}
-        isSubmitting={isVoting}
+        isSubmitting={isSubmitting}
       />
     </div>
   );

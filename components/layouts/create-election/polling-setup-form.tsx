@@ -114,6 +114,15 @@ export function PollingSetupForm({
                     <div key={field.id} className="flex items-center space-x-2">
                       <Input
                         className={`neumorphic-input text-sm flex-1 ${
+                          errors.pollingOfficers?.[index]?.name
+                            ? "border-red-500"
+                            : ""
+                        }`}
+                        placeholder="Officer Name"
+                        {...register(`pollingOfficers.${index}.name` as const)}
+                      />
+                      <Input
+                        className={`neumorphic-input text-sm flex-1 ${
                           errors.pollingOfficers?.[index]?.address
                             ? "border-red-500"
                             : ""
@@ -131,13 +140,18 @@ export function PollingSetupForm({
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
+                      {errors.pollingOfficers?.[index]?.name && (
+                        <p className="text-red-400 text-xs">
+                          {errors.pollingOfficers[index]?.name?.message}
+                        </p>
+                      )}
                       {errors.pollingOfficers?.[index]?.address && (
                         <p className="text-red-400 text-xs">
                           {errors.pollingOfficers[index]?.address?.message}
                         </p>
                       )}
                     </div>
-                  ))}
+                  ))}{" "}
                 </div>
 
                 {officerFields.length === 0 && (

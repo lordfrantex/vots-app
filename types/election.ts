@@ -5,6 +5,7 @@ import { PollingUnit } from "@/types/polling-unit";
 import { Category } from "@/types/category";
 
 export interface Election {
+  votedVoters: Voter[];
   id: string;
   name: string;
   startDate?: string;
@@ -16,6 +17,8 @@ export interface Election {
   categories: Category[];
   totalVoters?: number;
   totalVotes?: number;
+  accreditedVotersCount?: number;
+  accreditedVoters?: Voter[];
   candidates?: Candidate[];
   voters: Voter[];
 

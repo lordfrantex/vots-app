@@ -1,6 +1,7 @@
 export interface PollingOfficer {
   id: string;
   address: string;
+  name?: string;
   role: string;
 }
 

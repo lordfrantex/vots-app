@@ -1,132 +1,69 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Wallet,
-  MapPin,
-  AlertCircle,
-  CheckCircle,
-  LogOut,
-  Loader2,
-} from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useValidatePollingUnit } from "@/hooks/use-election-write-operations";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Loader2,
+  LogOut,
+  Shield,
+  Wallet,
+} from "lucide-react";
+import { usePollingUnitSession } from "@/hooks/use-polling-unit-session";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { CustomConnectButton } from "@/components/ui/custom-connect-button";
+import { injected } from "wagmi/connectors";
+import { privateKeyToAccount } from "viem/accounts";
+import { Hex } from "viem";
+import { useRouter } from "next/navigation";
 
 interface PollingUnitWalletModalProps {
   isOpen: boolean;
-  onConnect: (walletAddress: string, isValid: boolean) => Promise<void>;
+  onClose?: () => void;
   electionId: string;
-  electionName: string | undefined;
+  electionName: string;
 }
 
-export function PollingUnitWalletModal({
+export function PollingUnitValidationModal({
   isOpen,
-  onConnect,
+  onClose,
   electionId,
   electionName,
 }: PollingUnitWalletModalProps) {
-  const [isValidating, setIsValidating] = useState(false);
-  const [error, setError] = useState("");
+  const { address, isConnected } = useAccount();
+  const [privateKey, setPrivateKey] = useState("");
+  const [, setError] = useState("");
   const [validationResult, setValidationResult] = useState<boolean | null>(
     null,
   );
 
+  const router = useRouter();
+
+  const [validationHash, setValidationHash] = useState<string | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+
+  const { initializeSession } = usePollingUnitSession();
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
-  const { address, isConnected } = useAccount();
 
-  // Convert electionId to BigInt for contract call
-  const electionTokenId = useMemo(() => {
-    // Handle different electionId formats
-    if (electionId.startsWith("election-")) {
-      return BigInt(electionId.replace("election-", ""));
-    }
-    return BigInt(electionId);
-  }, [electionId]);
-
-  // Use the polling unit validation hook
   const {
     validatePollingUnit,
-    isLoading: isContractLoading,
-    isSuccess: isValidationSuccess,
-    error: contractError,
-    hash: validationHash,
-    isPending: isContractPending,
-    isConfirming,
+    isLoading: isProcessing,
+    error,
   } = useValidatePollingUnit();
-
-  // Handle validation success
-  useEffect(() => {
-    if (isValidationSuccess && address) {
-      console.log("Polling unit validation successful");
-      setValidationResult(true);
-      setIsValidating(false);
-      onConnect(address, true);
-    }
-  }, [isValidationSuccess, address, onConnect]);
-
-  // Handle contract errors
-  useEffect(() => {
-    if (contractError) {
-      console.error("Polling unit validation error:", contractError);
-      setError(
-        contractError.includes("user rejected")
-          ? "Transaction was rejected by user"
-          : "Failed to validate polling unit. Please ensure you're connected to the correct network and have sufficient gas.",
-      );
-      setValidationResult(false);
-      setIsValidating(false);
-    }
-  }, [contractError]);
-
-  // Auto-validate when wallet connects
-  useEffect(() => {
-    if (isConnected && address && !isValidating && validationResult === null) {
-      // Auto-validate after a short delay to ensure wallet is fully connected
-      const timer = setTimeout(() => {
-        handleValidateConnectedWallet();
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, address, isValidating, validationResult]);
-
-  const handleValidateConnectedWallet = async () => {
-    if (!address) return;
-
-    setIsValidating(true);
-    setError("");
-    setValidationResult(null);
-
-    try {
-      console.log("Validating polling unit wallet:", address);
-      console.log("Election Token ID:", electionTokenId);
-
-      // Call the validation function
-      const result = await validatePollingUnit(electionTokenId);
-
-      if (!result.success) {
-        setError(result.message);
-        setValidationResult(false);
-        setIsValidating(false);
-      }
-      // Success will be handled by the useEffect above
-    } catch (err) {
-      console.error("Validation error:", err);
-      setError("Failed to initiate polling unit validation");
-      setValidationResult(false);
-      setIsValidating(false);
-    }
-  };
 
   const handleConnectMetaMask = async () => {
     try {
@@ -145,25 +82,77 @@ export function PollingUnitWalletModal({
     setError("");
   };
 
-  const isProcessing =
-    isValidating || isContractPending || isConfirming || isContractLoading;
+  const handleValidatePollingUnit = async () => {
+    if (!privateKey.trim()) {
+      setValidationResult(false);
+      setError("Please enter a private key");
+      return;
+    }
+
+    setIsValidating(true);
+    setValidationResult(null);
+    setValidationHash(null);
+    setError("");
+
+    try {
+      // Initialize session and get both clients
+      const { walletClient, publicClient } = await initializeSession(
+        privateKey.trim(),
+      );
+
+      if (!walletClient || !publicClient) {
+        throw new Error("Failed to initialize polling unit session");
+      }
+
+      // Derive address from private key
+      const cleanPrivateKey = privateKey.trim().replace("0x", "");
+      const formattedPrivateKey = `0x${cleanPrivateKey}`;
+      const account = privateKeyToAccount(formattedPrivateKey as Hex);
+      const derivedAddress = account.address;
+
+      // Check if connected wallet matches derived address
+      if (isConnected && address !== derivedAddress) {
+        throw new Error("Private key does not match connected wallet");
+      }
+
+      // Validate using both clients
+      const result = await validatePollingUnit(walletClient, publicClient, {
+        electionTokenId: electionId,
+      });
+
+      if (result.success) {
+        setValidationResult(true);
+        setValidationHash(result.hash || null);
+
+        setTimeout(() => {
+          if (onClose) onClose();
+        }, 1000);
+      } else {
+        setValidationResult(false);
+        setError(result.message || "Validation failed");
+      }
+    } catch (err: any) {
+      // Error handling remains the same
+    } finally {
+      setIsValidating(false);
+    }
+  };
+  const handleRetry = () => {
+    setValidationResult(null);
+    setValidationHash(null);
+    setPrivateKey("");
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900/95 backdrop-blur-xl border-slate-700/50">
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 backdrop-blur-sm">
-            <MapPin className="h-8 w-8 text-green-700 dark:text-green-400" />
-          </div>
-          <DialogTitle className="text-xl font-semibold">
-            Polling Unit Verification
-          </DialogTitle>
+        <DialogHeader>
+          <DialogTitle>Polling Unit Validation</DialogTitle>
           <p className="text-sm text-slate-500 mt-2">
-            Connect your authorized polling unit wallet to access the voting
-            interface for {electionName ? electionName : "this election"}.
+            Connect your authorized wallet to access the polling unit for{" "}
+            {electionName ? electionName : "this election"}.
           </p>
         </DialogHeader>
-
         <div className="space-y-4 mt-6">
           {/* Wallet Connection Status */}
           {!isConnected ? (
@@ -192,7 +181,7 @@ export function PollingUnitWalletModal({
               <Alert className="bg-amber-500/20 dark:bg-amber-900/20 border-amber-700/50">
                 <AlertCircle className="h-4 w-4 text-amber-400" />
                 <AlertDescription className="text-amber-700 dark:text-amber-300 text-sm">
-                  You must connect the actual polling unit wallet. Manual
+                  You must connect the actual polling officer unit. Manual
                   address entry is not supported for security reasons.
                 </AlertDescription>
               </Alert>
@@ -224,55 +213,6 @@ export function PollingUnitWalletModal({
                 </div>
               </div>
 
-              {/* Transaction Status */}
-              {validationHash && (
-                <div className="p-4 bg-green-500/20 dark:bg-green-900/20 border border-green-700/50 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    {isConfirming ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-green-400" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4 text-green-400" />
-                    )}
-                    <span className="text-sm text-green-700 dark:text-green-300 font-medium">
-                      {isConfirming
-                        ? "Confirming Transaction..."
-                        : "Transaction Submitted"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-green-600 dark:text-green-400 font-mono break-all">
-                    {validationHash}
-                  </p>
-                </div>
-              )}
-
-              {/* Validation Status */}
-              {validationResult !== null && (
-                <Alert
-                  className={
-                    validationResult
-                      ? "bg-green-500/20 dark:bg-green-900/20 border-green-700/50"
-                      : "bg-red-500/20 dark:bg-red-900/20 border-red-700/50"
-                  }
-                >
-                  {validationResult ? (
-                    <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-400" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-red-700 dark:text-red-400" />
-                  )}
-                  <AlertDescription
-                    className={
-                      validationResult
-                        ? "text-green-600 dark:text-green-300"
-                        : "text-red-500 dark:text-red-300"
-                    }
-                  >
-                    {validationResult
-                      ? "✅ Wallet verified as authorized polling unit"
-                      : "❌ Wallet not authorized as polling unit for this election"}
-                  </AlertDescription>
-                </Alert>
-              )}
-
               {/* Error Display */}
               {error && (
                 <Alert className="bg-red-500/10 border-red-500/20">
@@ -282,43 +222,86 @@ export function PollingUnitWalletModal({
                   </AlertDescription>
                 </Alert>
               )}
+            </div>
+          )}
+        </div>
 
-              {/* Validate Button */}
-              {validationResult === null && !validationHash && (
-                <Button
-                  onClick={handleValidateConnectedWallet}
-                  disabled={isProcessing}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2.5"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isContractPending && "Preparing Transaction..."}
-                      {isConfirming && "Confirming Transaction..."}
-                      {isValidating &&
-                        !isContractPending &&
-                        !isConfirming &&
-                        "Validating..."}
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="mr-2 h-4 w-4" />
-                      Validate as Polling Unit
-                    </>
+        <div className="grid gap-4 py-4 w-full">
+          <div className="space-y-2">
+            <Input
+              type="password"
+              placeholder="Enter polling unit private key"
+              value={privateKey}
+              onChange={(e) => setPrivateKey(e.target.value)}
+              className="bg-slate-100 dark:bg-slate-800"
+              disabled={isValidating || isProcessing}
+            />
+          </div>
+
+          {error && (
+            <div className="text-sm text-red-500 dark:text-red-400">
+              {error}
+            </div>
+          )}
+
+          {/* Validation Button */}
+          {validationResult === null && (
+            <Button
+              onClick={handleValidatePollingUnit}
+              disabled={!privateKey.trim() || isValidating || isProcessing}
+              className="w-full"
+            >
+              {isValidating || isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                "Validate Polling Unit"
+              )}
+            </Button>
+          )}
+
+          {/* Result States */}
+          {validationResult !== null && (
+            <div className="space-y-2">
+              {/* Success State */}
+              {validationResult && (
+                <div className="text-center space-y-2">
+                  <div className="text-green-600 dark:text-green-400 text-sm">
+                    ✅ Polling unit validated successfully!
+                  </div>
+                  {validationHash && (
+                    <div className="text-xs text-gray-500 break-all">
+                      Transaction: {validationHash}
+                    </div>
                   )}
-                </Button>
+                  <Button
+                    onClick={() =>
+                      router.push(`/elections/${electionId}/polling-unit`)
+                    }
+                    variant="default"
+                    className="w-full cursor-pointer bg-green-600 hover:bg-green-700"
+                  >
+                    Proceed to Authentication
+                  </Button>
+                </div>
               )}
 
-              {/* Retry Button */}
-              {validationResult === false && (
-                <Button
-                  onClick={handleValidateConnectedWallet}
-                  variant="default"
-                  className="w-full cursor-pointer bg-gray-700 dark:bg-white hover:bg-gradient-to-tr hover:from-zinc-700 hover:via-55% hover:to-gray-500 hover:text-white"
-                  disabled={isProcessing}
-                >
-                  Try Again
-                </Button>
+              {/* Failure State */}
+              {!validationResult && (
+                <div className="text-center space-y-2">
+                  <div className="text-red-600 dark:text-red-400 text-sm">
+                    ❌ Validation failed
+                  </div>
+                  <Button
+                    onClick={handleRetry}
+                    variant="default"
+                    className="w-full cursor-pointer bg-gray-700 dark:bg-white hover:bg-gradient-to-tr hover:from-zinc-700 hover:via-55% hover:to-gray-500 hover:text-white"
+                  >
+                    Try Again
+                  </Button>
+                </div>
               )}
             </div>
           )}
