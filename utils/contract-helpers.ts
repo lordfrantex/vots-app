@@ -349,6 +349,7 @@ export function convertToContractElectionParams(
       pollingOfficers: pollingOfficersList,
       electionCategories,
     };
+    console.log("Converted ElectionParams:", electionParams);
 
     return electionParams;
   } catch (error) {
