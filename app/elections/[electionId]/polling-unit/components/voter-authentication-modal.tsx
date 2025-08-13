@@ -23,6 +23,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useSessionValidateVoter } from "@/hooks/use-session-validate-voter";
+import { useElectionDetails } from "@/hooks/use-contract-address";
 
 interface VoterAuthenticationModalProps {
   electionId: string;
@@ -57,6 +58,11 @@ const VoterAuthenticationModal = ({
     };
     error?: string;
   } | null>(null);
+
+  // FETCHING ELECTION DATA
+  // This is a placeholder for fetching election data if needed
+  const { election } = useElectionDetails(electionId);
+  console.log("Election Details:", election);
 
   // Convert electionId to BigInt for contract call
   const electionTokenId = useMemo(() => {

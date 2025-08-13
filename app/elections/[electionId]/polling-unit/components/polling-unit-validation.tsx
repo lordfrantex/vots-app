@@ -278,7 +278,7 @@ export function PollingUnitValidationModal({
                   )}
                   <Button
                     onClick={() =>
-                      router.push(`/elections/${electionId}/polling-unit`)
+                      (window.location.href = `/elections/${electionId}/polling-unit`)
                     }
                     variant="default"
                     className="w-full cursor-pointer bg-green-600 hover:bg-green-700"
