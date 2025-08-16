@@ -1,4 +1,4 @@
-import { sepolia, avalancheFuji } from "wagmi/chains";
+import { sepolia, avalancheFuji } from "viem/chains";
 
 export const electionAddress = {
   [sepolia.id]: "0xBbbFfDad285D2c3bB91DDe7507EbbF0882aCE8bd" as `0x${string}`,
